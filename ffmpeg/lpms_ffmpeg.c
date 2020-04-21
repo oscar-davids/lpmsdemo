@@ -1351,3 +1351,811 @@ void lpms_transcode_stop(struct transcode_thread *handle) {
 
   free(handle);
 }
+
+#ifdef _ADD_LPMS_DNN_
+
+#include "libswscale/swscale.h"
+#include "libavutil/imgutils.h"
+#include "tensorflow/c/c_api.h"
+
+
+DNNModel *ff_dnn_load_model_tf(const char *model_filename);
+
+DNNReturnType ff_dnn_execute_model_tf(const DNNModel *model, DNNData *outputs, uint32_t nb_output);
+
+void ff_dnn_free_model_tf(DNNModel **model);
+
+typedef struct TFModel{
+    TF_Graph *graph;
+    TF_Session *session;
+    TF_Status *status;
+    TF_Output input;
+    TF_Tensor *input_tensor;
+    TF_Output *outputs;
+    TF_Tensor **output_tensors;
+    uint32_t nb_output;
+} TFModel;
+
+static void free_buffer(void *data, size_t length)
+{
+    av_freep(&data);
+}
+
+static TF_Buffer *read_graph(const char *model_filename)
+{
+    TF_Buffer *graph_buf;
+    unsigned char *graph_data = NULL;
+    AVIOContext *model_file_context;
+    long size, bytes_read;
+
+    if (avio_open(&model_file_context, model_filename, AVIO_FLAG_READ) < 0){
+        return NULL;
+    }
+
+    size = avio_size(model_file_context);
+
+    graph_data = av_malloc(size);
+    if (!graph_data){
+        avio_closep(&model_file_context);
+        return NULL;
+    }
+    bytes_read = avio_read(model_file_context, graph_data, size);
+    avio_closep(&model_file_context);
+    if (bytes_read != size){
+        av_freep(&graph_data);
+        return NULL;
+    }
+
+    graph_buf = TF_NewBuffer();
+    graph_buf->data = (void *)graph_data;
+    graph_buf->length = size;
+    graph_buf->data_deallocator = free_buffer;
+
+    return graph_buf;
+}
+
+static TF_Tensor *allocate_input_tensor(const DNNData *input)
+{
+    TF_DataType dt;
+    size_t size;
+    int64_t input_dims[] = {1, input->height, input->width, input->channels};
+    switch (input->dt) {
+    case DNN_FLOAT:
+        dt = TF_FLOAT;
+        size = sizeof(float);
+        break;
+    case DNN_UINT8:
+        dt = TF_UINT8;
+        size = sizeof(char);
+        break;
+    default:
+        //av_assert0(!"should not reach here");
+        break;
+    }
+
+    return TF_AllocateTensor(dt, input_dims, 4,
+                             input_dims[1] * input_dims[2] * input_dims[3] * size);
+}
+
+static DNNReturnType get_input_tf(void *model, DNNData *input, const char *input_name)
+{
+    TFModel *tf_model = (TFModel *)model;
+    TF_Status *status;
+    int64_t dims[4];
+
+    TF_Output tf_output;
+    tf_output.oper = TF_GraphOperationByName(tf_model->graph, input_name);
+    if (!tf_output.oper)
+        return DNN_ERROR;
+
+    tf_output.index = 0;
+    input->dt = TF_OperationOutputType(tf_output);
+
+    status = TF_NewStatus();
+    TF_GraphGetTensorShape(tf_model->graph, tf_output, dims, 4, status);
+    if (TF_GetCode(status) != TF_OK){
+        TF_DeleteStatus(status);
+        return DNN_ERROR;
+    }
+    TF_DeleteStatus(status);
+
+    //currently only NHWC is supported
+    //some case is = -1
+    //av_assert0(dims[0] == 1);    
+    input->height = dims[1];
+    input->width = dims[2];
+    input->channels = dims[3];
+
+    return DNN_SUCCESS;
+}
+
+static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char *input_name, const char **output_names, uint32_t nb_output)
+{
+    TFModel *tf_model = (TFModel *)model;
+    TF_SessionOptions *sess_opts;
+    const TF_Operation *init_op = TF_GraphOperationByName(tf_model->graph, "init");
+
+    // Input operation
+    tf_model->input.oper = TF_GraphOperationByName(tf_model->graph, input_name);
+    if (!tf_model->input.oper){
+        return DNN_ERROR;
+    }
+    tf_model->input.index = 0;
+    if (tf_model->input_tensor){
+        TF_DeleteTensor(tf_model->input_tensor);
+    }
+    tf_model->input_tensor = allocate_input_tensor(input);
+    if (!tf_model->input_tensor){
+        return DNN_ERROR;
+    }
+    input->data = (float *)TF_TensorData(tf_model->input_tensor);
+
+    // Output operation
+    if (nb_output == 0)
+        return DNN_ERROR;
+
+    av_freep(&tf_model->outputs);
+    tf_model->outputs = av_malloc_array(nb_output, sizeof(*tf_model->outputs));
+    if (!tf_model->outputs)
+        return DNN_ERROR;
+    for (int i = 0; i < nb_output; ++i) {
+        tf_model->outputs[i].oper = TF_GraphOperationByName(tf_model->graph, output_names[i]);
+        if (!tf_model->outputs[i].oper){
+            av_freep(&tf_model->outputs);
+            return DNN_ERROR;
+        }
+        tf_model->outputs[i].index = 0;
+    }
+
+    if (tf_model->output_tensors) {
+        for (uint32_t i = 0; i < tf_model->nb_output; ++i) {
+            if (tf_model->output_tensors[i]) {
+                TF_DeleteTensor(tf_model->output_tensors[i]);
+                tf_model->output_tensors[i] = NULL;
+            }
+        }
+    }
+    av_freep(&tf_model->output_tensors);
+    tf_model->output_tensors = av_mallocz_array(nb_output, sizeof(*tf_model->output_tensors));
+    if (!tf_model->output_tensors) {
+        av_freep(&tf_model->outputs);
+        return DNN_ERROR;
+    }
+
+    tf_model->nb_output = nb_output;
+
+    if (tf_model->session){
+        TF_CloseSession(tf_model->session, tf_model->status);
+        TF_DeleteSession(tf_model->session, tf_model->status);
+    }
+
+    sess_opts = TF_NewSessionOptions();
+    // protobuf data for auto memory gpu_options.allow_growth=True and gpu_options.visible_device_list="0" 
+	uint8_t config[7] = { 0x32, 0x5, 0x20, 0x1, 0x2a, 0x01, 0x30 }; 
+	TF_SetConfig(sess_opts, (void*)config, 7, tf_model->status);
+
+
+    tf_model->session = TF_NewSession(tf_model->graph, sess_opts, tf_model->status);
+    TF_DeleteSessionOptions(sess_opts);
+    if (TF_GetCode(tf_model->status) != TF_OK)
+    {
+        return DNN_ERROR;
+    }
+
+    // Run initialization operation with name "init" if it is present in graph
+    if (init_op){
+        TF_SessionRun(tf_model->session, NULL,
+                      NULL, NULL, 0,
+                      NULL, NULL, 0,
+                      &init_op, 1, NULL, tf_model->status);
+        if (TF_GetCode(tf_model->status) != TF_OK)
+        {
+            return DNN_ERROR;
+        }
+    }
+
+    return DNN_SUCCESS;
+}
+
+static DNNReturnType load_tf_model(TFModel *tf_model, const char *model_filename)
+{
+    TF_Buffer *graph_def;
+    TF_ImportGraphDefOptions *graph_opts;
+
+    graph_def = read_graph(model_filename);
+    if (!graph_def){
+        return DNN_ERROR;
+    }
+    tf_model->graph = TF_NewGraph();
+    tf_model->status = TF_NewStatus();
+    graph_opts = TF_NewImportGraphDefOptions();
+    TF_GraphImportGraphDef(tf_model->graph, graph_def, graph_opts, tf_model->status);
+    TF_DeleteImportGraphDefOptions(graph_opts);
+    TF_DeleteBuffer(graph_def);
+    if (TF_GetCode(tf_model->status) != TF_OK){
+        TF_DeleteGraph(tf_model->graph);
+        TF_DeleteStatus(tf_model->status);
+        return DNN_ERROR;
+    }
+
+    return DNN_SUCCESS;
+}
+
+DNNModel *ff_dnn_load_model_tf(const char *model_filename)
+{
+    DNNModel *model = NULL;
+    TFModel *tf_model = NULL;
+
+    model = av_malloc(sizeof(DNNModel));
+    if (!model){
+        return NULL;
+    }
+
+    tf_model = av_mallocz(sizeof(TFModel));
+    if (!tf_model){
+        av_freep(&model);
+        return NULL;
+    }
+
+    if (load_tf_model(tf_model, model_filename) != DNN_SUCCESS){
+        return NULL;        
+    }
+
+    model->model = (void *)tf_model;
+    model->set_input_output = &set_input_output_tf;
+    model->get_input = &get_input_tf;
+
+    return model;
+}
+
+DNNReturnType ff_dnn_execute_model_tf(const DNNModel *model, DNNData *outputs, uint32_t nb_output)
+{
+    TFModel *tf_model = (TFModel *)model->model;
+    uint32_t nb = FFMIN(nb_output, tf_model->nb_output);
+    if (nb == 0)
+        return DNN_ERROR;
+
+    //av_assert0(tf_model->output_tensors);
+    for (uint32_t i = 0; i < tf_model->nb_output; ++i) {
+        if (tf_model->output_tensors[i]) {
+            TF_DeleteTensor(tf_model->output_tensors[i]);
+            tf_model->output_tensors[i] = NULL;
+        }
+    }
+
+    TF_SessionRun(tf_model->session, NULL,
+                  &tf_model->input, &tf_model->input_tensor, 1,
+                  tf_model->outputs, tf_model->output_tensors, nb,
+                  NULL, 0, NULL, tf_model->status);
+
+    if (TF_GetCode(tf_model->status) != TF_OK){
+        return DNN_ERROR;
+    }
+
+    for (uint32_t i = 0; i < nb; ++i) {
+        outputs[i].height = TF_Dim(tf_model->output_tensors[i], 1);
+        outputs[i].width = TF_Dim(tf_model->output_tensors[i], 2);
+        outputs[i].channels = TF_Dim(tf_model->output_tensors[i], 3);
+        outputs[i].data = TF_TensorData(tf_model->output_tensors[i]);
+        outputs[i].dt = TF_TensorType(tf_model->output_tensors[i]);
+    }
+
+    return DNN_SUCCESS;
+}
+
+void ff_dnn_free_model_tf(DNNModel **model)
+{
+    TFModel *tf_model;
+
+    if (*model){
+        tf_model = (TFModel *)(*model)->model;
+        if (tf_model->graph){
+            TF_DeleteGraph(tf_model->graph);
+        }
+        if (tf_model->session){
+            TF_CloseSession(tf_model->session, tf_model->status);
+            TF_DeleteSession(tf_model->session, tf_model->status);
+        }
+        if (tf_model->status){
+            TF_DeleteStatus(tf_model->status);
+        }
+        if (tf_model->input_tensor){
+            TF_DeleteTensor(tf_model->input_tensor);
+        }
+        if (tf_model->output_tensors) {
+            for (uint32_t i = 0; i < tf_model->nb_output; ++i) {
+                if (tf_model->output_tensors[i]) {
+                    TF_DeleteTensor(tf_model->output_tensors[i]);
+                    tf_model->output_tensors[i] = NULL;
+                }
+            }
+        }
+        av_freep(&tf_model->outputs);
+        av_freep(&tf_model->output_tensors);
+        av_freep(&tf_model);
+        av_freep(model);
+    }
+}
+
+DNNModule *get_dnn_module(DNNBackendType backend_type)
+{
+    DNNModule *dnn_module;
+
+    dnn_module = av_malloc(sizeof(DNNModule));
+    if(!dnn_module){
+        return NULL;
+    }
+
+    switch(backend_type){
+    case DNN_TF:
+    #if (CONFIG_LIBTENSORFLOW == 1)
+        dnn_module->load_model = &ff_dnn_load_model_tf;
+        dnn_module->execute_model = &ff_dnn_execute_model_tf;
+        dnn_module->free_model = &ff_dnn_free_model_tf;
+    #else
+        av_freep(&dnn_module);
+        return NULL;
+    #endif
+        break;
+    default:
+        av_log(NULL, AV_LOG_ERROR, "Module backend_type is not native or tensorflow\n");
+        av_freep(&dnn_module);
+        return NULL;
+    }
+
+    return dnn_module;
+}
+
+static int copy_from_frame_to_dnn(LVPDnnContext *ctx, const AVFrame *frame)
+{
+    if(ctx == NULL || ctx->swscaleframe == 0 || ctx->sws_rgb_scale) return DNN_ERROR;
+
+    int bytewidth = av_image_get_linesize(ctx->swscaleframe->format, ctx->swscaleframe->width, 0);
+    DNNData *dnn_input = &ctx->input;
+
+    if(ctx->swframeforHW)
+    {
+        if(av_hwframe_transfer_data(ctx->swframeforHW, frame, 0) != 0)
+            return AVERROR(EIO);
+        
+        sws_scale(ctx->sws_rgb_scale, (const uint8_t **)ctx->swframeforHW->data, ctx->swframeforHW->linesize,
+                  0, ctx->swframeforHW->height, (uint8_t * const*)(&ctx->swscaleframe->data),
+                 ctx->swscaleframe->linesize);
+
+    }
+    else
+    {
+        sws_scale(ctx->sws_rgb_scale, (const uint8_t **)frame->data, frame->linesize,
+                  0, frame->height, (uint8_t * const*)(&ctx->swscaleframe->data),
+                  ctx->swscaleframe->linesize);
+    }
+
+
+    if (dnn_input->dt == DNN_FLOAT) {
+        sws_scale(ctx->sws_gray8_to_grayf32, (const uint8_t **)ctx->swscaleframe->data, ctx->swscaleframe->linesize,
+                    0, ctx->swscaleframe->height, (uint8_t * const*)(&dnn_input->data),
+                    (const int [4]){ctx->swscaleframe->width * 3 * sizeof(float), 0, 0, 0});
+    } else {
+        //av_assert0(dnn_input->dt == DNN_UINT8);
+        av_image_copy_plane(dnn_input->data, bytewidth,
+                            ctx->swscaleframe->data[0], ctx->swscaleframe->linesize[0],
+                            bytewidth, ctx->swscaleframe->height);
+    }
+    
+    return 0;   
+}
+
+LVPDnnContext* pgdnncontext = NULL;
+
+int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfidence)
+{ 
+
+  char slvpinfo[256] = {0,};
+  *fconfidence = 0.0;
+  int dnn_result;
+  if(ctx == NULL) return DNN_ERROR;
+  //ctx->framenum = 1;
+  //if(ctx->sample_rate > 0 && ctx->framenum % ctx->sample_rate == 0 &&
+  //  copy_from_frame_to_dnn(ctx, in) == DNN_SUCCESS)
+
+  if(copy_from_frame_to_dnn(ctx, in) != DNN_SUCCESS) return DNN_ERROR;
+
+  dnn_result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
+  if (dnn_result != DNN_SUCCESS){
+      av_log(ctx, AV_LOG_ERROR, "failed to execute model\n");
+      av_frame_free(&in);
+      return AVERROR(EIO);
+  }
+
+  DNNData *dnn_output = &ctx->output;
+  float* pfdata = dnn_output->data;
+  int lendata = ctx->output.height;
+  //            
+  //if(lendata >= 2 && pfdata[0] >= ctx->valid_threshold)
+  {
+      *fconfidence = pfdata[0];
+      snprintf(slvpinfo, sizeof(slvpinfo), "probability %.2f", pfdata[0]);  
+      
+      //av_dict_set(metadata, "lavfi.lvpdnn.text", slvpinfo, 0);
+      if(ctx->logfile)
+      {
+          fprintf(ctx->logfile,"%s\n",slvpinfo);                
+      }      
+  }
+  //for DEBUG
+  av_log(0, AV_LOG_INFO, "%d frame detected as %s confidence\n",ctx->framenum,slvpinfo);        
+
+
+  if(ctx->logfile && ctx->framenum % 20 == 0)
+      fflush(ctx->logfile);
+      
+  return dnn_result;
+}
+
+static int hw_decoder_init(LVPDnnContext* lvpctx, const enum AVHWDeviceType type)
+{
+    int err = 0;
+	AVCodecContext *ctx = lvpctx->decoder_ctx;
+	if(ctx == NULL) return -1;
+
+    if ((err = av_hwdevice_ctx_create(&lvpctx->hw_device_ctx, type,NULL, NULL, 0)) < 0){
+        fprintf(stderr, "Failed to create specified HW device.\n");
+        return err;
+    }
+    ctx->hw_device_ctx = av_buffer_ref(lvpctx->hw_device_ctx);
+
+    return err;
+}
+static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat *pix_fmts)
+{
+    const enum AVPixelFormat *p;
+	//AVCodecContext *ctx = lvpctx->decoder_ctx;
+	if(ctx == NULL || pgdnncontext) return AV_PIX_FMT_NONE;
+
+    for (p = pix_fmts; *p != -1; p++) {
+        if (*p == pgdnncontext->hw_pix_fmt)
+            return *p;
+    }
+
+    fprintf(stderr, "Failed to get HW surface format.\n");
+    return AV_PIX_FMT_NONE;
+}
+
+static int dnn_decodeframe(AVCodecContext *avctx,AVPacket *pkt, AVFrame *frame, int *got_frame)
+{
+    int ret;
+
+    *got_frame = 0;
+    if (pkt) {
+        ret = avcodec_send_packet(avctx, pkt);
+        if (ret < 0 && ret != AVERROR_EOF)
+            return ret;
+    }
+    ret = avcodec_receive_frame(avctx, frame);
+    if (ret < 0 && ret != AVERROR(EAGAIN))
+        return ret;
+    if (ret >= 0)
+        *got_frame = 1;
+    return 0;
+}
+
+static int prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW)
+{
+	int ret = 0;
+
+	enum AVPixelFormat fmt = 0;
+	
+	if(flagHW)
+		fmt = ctx->hw_pix_fmt;
+	else 
+		fmt = frame->format;
+	
+    ctx->sws_rgb_scale = sws_getContext(frame->width, frame->height, fmt,
+                                            ctx->input.width, ctx->input.height, AV_PIX_FMT_RGB24,
+                                            SWS_BILINEAR, NULL, NULL, NULL);
+
+    ctx->sws_gray8_to_grayf32 = sws_getContext(ctx->input.width*3,
+                                                ctx->input.height,
+                                                AV_PIX_FMT_GRAY8,
+                                                ctx->input.width*3,
+                                                ctx->input.height,
+                                                AV_PIX_FMT_GRAYF32,
+                                                0, NULL, NULL, NULL);  
+
+  
+
+    if(ctx->sws_rgb_scale == 0 || ctx->sws_gray8_to_grayf32 == 0)
+    {
+        av_log(0, AV_LOG_ERROR, "could not create scale context\n");
+        return AVERROR(ENOMEM);
+    }
+
+    ctx->swscaleframe = av_frame_alloc();
+    if (!ctx->swscaleframe)
+        return AVERROR(ENOMEM);
+
+    ctx->swscaleframe->format = AV_PIX_FMT_RGB24;
+    ctx->swscaleframe->width  = ctx->input.width;
+    ctx->swscaleframe->height = ctx->input.height;
+    ret = av_frame_get_buffer(ctx->swscaleframe, 0);
+    if (ret < 0) {
+        av_frame_free(&ctx->swscaleframe);
+        return ret;
+    }
+    if (flagHW){
+        ctx->swframeforHW = av_frame_alloc();
+        if (!ctx->swframeforHW)
+        return AVERROR(ENOMEM);
+    }
+	
+	return ret;
+}
+
+
+int  lpms_dnnexecute(char* ivpath, int  flagHW, float* porob)
+{
+	char sdevicetype[64] = {0,};
+	int	 ret, i;
+	AVStream *video = NULL;
+	AVPacket packet;
+
+	LVPDnnContext *context = pgdnncontext;
+	if(context == NULL) return DNN_ERROR;	
+
+	*porob = 0.0;
+
+	if(flagHW){
+		strcpy(sdevicetype,"cuda");
+		context->type = av_hwdevice_find_type_by_name(sdevicetype);
+		if (context->type == AV_HWDEVICE_TYPE_NONE) return DNN_ERROR;
+	}
+
+	/* open the input file */
+    if (avformat_open_input(&context->input_ctx, ivpath, NULL, NULL) != 0) {
+        fprintf(stderr, "Cannot open input file '%s'\n", ivpath);
+        return DNN_ERROR;
+    }
+
+    if (avformat_find_stream_info(context->input_ctx, NULL) < 0) {
+        fprintf(stderr, "Cannot find input stream information.\n");
+        return DNN_ERROR;
+    }
+
+    /* find the video stream information */
+    ret = av_find_best_stream(context->input_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &context->decoder, 0);
+    if (ret < 0) {
+        fprintf(stderr, "Cannot find a video stream in the input file\n");
+        return DNN_ERROR;
+    }
+    context->video_stream = ret;
+	
+	if(flagHW){
+		for (i = 0;; i++) {
+	        const AVCodecHWConfig *config = avcodec_get_hw_config(context->decoder, i);
+	        if (!config) {
+	            fprintf(stderr, "Decoder %s does not support device type %s.\n",
+	                    context->decoder->name, av_hwdevice_get_type_name(context->type));
+	            return -1;
+	        }
+	        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+	            config->device_type == context->type) {
+	            context->hw_pix_fmt = config->pix_fmt;
+	            break;
+	        }
+    	}
+	}	
+	if (!(context->decoder_ctx = avcodec_alloc_context3(context->decoder)))
+			return AVERROR(ENOMEM);
+	
+	video = context->input_ctx->streams[context->video_stream];
+	if (avcodec_parameters_to_context(context->decoder_ctx, video->codecpar) < 0)
+		return -1;
+
+	if(flagHW){
+		context->decoder_ctx->get_format  = get_hw_format;
+		if (hw_decoder_init(context, context->type) < 0)
+			return -1;
+	}
+
+	if ((ret = avcodec_open2(context->decoder_ctx, context->decoder, NULL)) < 0) {
+        fprintf(stderr, "Failed to open codec for stream #%u\n", context->video_stream);
+        return -1;
+    }
+
+	/* actual decoding and dump the raw data */
+	context->framenum = 0;
+	int ngotframe = 0;
+  float fconfidence ,ftotal = 0.0;
+  int dnnresult, count = 0;
+  
+	context->readframe = av_frame_alloc();
+
+	while (ret >= 0) {
+
+		if ((ret = av_read_frame(context->input_ctx, &packet)) < 0)
+	    	break;
+
+	    if (context->video_stream == packet.stream_index)
+	    {	
+	      ret = dnn_decodeframe(context->decoder_ctx,&packet,context->readframe,&ngotframe);
+        if(ret < 0 || ngotframe == 0)
+          continue;
+
+        if(context->sws_rgb_scale == NULL || context->sws_gray8_to_grayf32 == NULL)
+        {
+          ret = prepare_sws_context(context,context->readframe,flagHW);
+          if(ret < 0)
+            break;
+        }
+        context->framenum ++;
+        if(context->framenum % context->sample_rate == 0){
+          dnnresult = lpms_detectoneframe(context,context->readframe,&fconfidence);
+          if(dnnresult == DNN_SUCCESS){
+            count++;
+            ftotal += fconfidence;
+          }
+        }
+			  av_frame_unref(context->readframe);
+	    }
+		
+	    av_packet_unref(&packet);
+	}
+
+  if(count)
+  	*porob = ftotal / count;
+  
+  //release frame and scale context
+  if(context->readframe)
+		  av_frame_free(&context->readframe);
+  if(context->swscaleframe)
+      av_frame_free(&context->swscaleframe);
+  if(context->swframeforHW)
+      av_frame_free(&context->swframeforHW);
+
+  sws_freeContext(context->sws_rgb_scale);
+  context->sws_rgb_scale = NULL;
+  sws_freeContext(context->sws_gray8_to_grayf32);
+  context->sws_gray8_to_grayf32 = NULL;
+  //release avcontext
+
+	avcodec_free_context(&context->decoder_ctx);
+	avformat_close_input(&context->input_ctx);
+	av_buffer_unref(&context->hw_device_ctx);	
+
+	return DNN_SUCCESS;
+}
+
+int   lpms_dnnnew()
+{
+  return 0;
+}
+int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold)
+{   
+  if(fmodelpath == NULL) return DNN_ERROR;
+  if(pgdnncontext != NULL) return DNN_SUCCESS;
+  
+  LVPDnnContext *ctx = (LVPDnnContext*)av_mallocz(sizeof(LVPDnnContext));
+  pgdnncontext = ctx;
+
+  strcpy(ctx->model_filename,fmodelpath);
+	strcpy(ctx->model_inputname,input);
+	strcpy(ctx->model_outputname,output);
+  ctx->sample_rate = samplerate;
+  ctx->valid_threshold = fthreshold;
+
+
+    if (strlen(ctx->model_filename)<=0) {
+        av_log(ctx, AV_LOG_ERROR, "model file for network is not specified\n");
+        return AVERROR(EINVAL);
+    }
+    if (strlen(ctx->model_inputname)<=0) {
+        av_log(ctx, AV_LOG_ERROR, "input name of the model network is not specified\n");
+        return AVERROR(EINVAL);
+    }
+    if (strlen(ctx->model_outputname)<=0) {
+        av_log(ctx, AV_LOG_ERROR, "output name of the model network is not specified\n");
+        return AVERROR(EINVAL);
+    }
+
+    if (!ctx->log_filename) {
+        av_log(ctx, AV_LOG_INFO, "output file for log is not specified\n");
+        //return AVERROR(EINVAL);
+    }
+
+    ctx->backend_type = 1;
+    ctx->dnn_module = get_dnn_module(ctx->backend_type);
+    if (!ctx->dnn_module) {
+        av_log(ctx, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
+        return AVERROR(ENOMEM);
+    }
+    if (!ctx->dnn_module->load_model) {
+        av_log(ctx, AV_LOG_ERROR, "load_model for network is not specified\n");
+        return AVERROR(EINVAL);
+    }
+
+    ctx->model = (ctx->dnn_module->load_model)(ctx->model_filename);
+    if (!ctx->model) {
+        av_log(ctx, AV_LOG_ERROR, "could not load DNN model\n");
+        return AVERROR(EINVAL);
+    }
+
+    if(ctx->log_filename){        
+        ctx->logfile = fopen(ctx->log_filename, "w");
+    }
+    else{        
+        ctx->logfile = NULL;
+    }
+
+    ctx->framenum = 0;
+    //config input
+
+    DNNReturnType result;
+    DNNData model_input;
+    int check;
+
+    result = ctx->model->get_input(ctx->model->model, &model_input, ctx->model_inputname);
+    if (result != DNN_SUCCESS) {
+        av_log(ctx, AV_LOG_ERROR, "could not get input from the model\n");
+        return AVERROR(EIO);
+    }
+
+    ctx->input.width    = model_input.width;
+    ctx->input.height   = model_input.height;
+    ctx->input.channels = model_input.channels;
+    ctx->input.dt = model_input.dt;
+
+    result = (ctx->model->set_input_output)(ctx->model->model,
+                                        &ctx->input, ctx->model_inputname,
+                                        (const char **)&ctx->model_outputname, 1);
+    
+
+    if (result != DNN_SUCCESS) {
+        av_log(ctx, AV_LOG_ERROR, "could not set input and output for the model\n");
+        return AVERROR(EIO);
+    }
+
+    // have a try run in case that the dnn model resize the frame
+    result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
+    if (result != DNN_SUCCESS){
+        av_log(ctx, AV_LOG_ERROR, "failed to execute model\n");
+        return AVERROR(EIO);
+    }
+    
+    return DNN_SUCCESS;
+}
+
+void  lpms_dnnfree()
+{
+  LVPDnnContext *context = pgdnncontext;
+
+  if(context == NULL) return;
+
+  sws_freeContext(context->sws_rgb_scale);
+  sws_freeContext(context->sws_gray8_to_grayf32);  
+
+  if (context->dnn_module)
+      (context->dnn_module->free_model)(&context->model);
+
+  av_freep(&context->dnn_module);
+
+  if(context->readframe)
+		av_frame_free(&context->readframe);
+
+  if(context->swscaleframe)
+      av_frame_free(&context->swscaleframe);
+
+  if(context->swframeforHW)
+      av_frame_free(&context->swframeforHW);
+
+  if(context->log_filename && context->logfile)
+  {
+      fclose(context->logfile);
+  }
+
+  if(pgdnncontext)
+    av_free(pgdnncontext);
+  pgdnncontext = NULL;
+    
+}
+
+#endif
