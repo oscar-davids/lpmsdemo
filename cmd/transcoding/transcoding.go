@@ -62,6 +62,7 @@ func main() {
 	}
 
 	ffmpeg.InitFFmpeg()
+	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
 
 	fmt.Printf("Setting fname %s encoding %d renditions with %v\n", fname, len(options), lbl)
 	res, err := ffmpeg.Transcode3(&ffmpeg.TranscodeOptionsIn{
