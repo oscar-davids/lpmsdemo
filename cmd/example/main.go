@@ -205,6 +205,8 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 	workDir := ".tmp/"
 	t := transcoder.NewFFMpegSegmentTranscoder(profiles, workDir)
 
+	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+
 	//Create variants in the stream
 
 	/*
