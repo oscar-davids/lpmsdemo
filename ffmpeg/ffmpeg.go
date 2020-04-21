@@ -324,13 +324,24 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	var fconfidence float32 = 0.0
 	var srtname string
 	if pdnn.Profile.Detector.SampleRate > 0 {
+		/*
+			gdetector := NewTranscoder()
+			defer gdetector.StopTranscoder()
+			fconfidence, err = gdetector.Detector(input, pdnn)
+			if err != nil {
+				return nil, err
+			}
+		*/
 
-		gdetector := NewTranscoder()
-		defer gdetector.StopTranscoder()
-		fconfidence, err = gdetector.Detector(input, pdnn)
-		if err != nil {
-			return nil, err
+		flagHW := 0
+		if input.Accel == Nvidia {
+			flagHW = 1
 		}
+
+		prob := C.float(fconfidence)
+		C.lpms_dnnexecute(fname, C.int(flagHW), &prob)
+		fconfidence = float32(prob)
+
 		if len(ps) == 0 {
 			tr := make([]MediaInfo, 1)
 			dec := MediaInfo{
@@ -503,4 +514,28 @@ func (t *Transcoder) StopTranscoder() {
 
 func InitFFmpeg() {
 	C.lpms_init()
+}
+
+var initengine bool = false
+
+func InitDnnEngine(dnncfg VideoProfile) {
+	if initengine == false {
+
+		model := C.CString(dnncfg.Detector.ModelPath)
+		defer C.free(unsafe.Pointer(model))
+		Input := C.CString(dnncfg.Detector.Input)
+		defer C.free(unsafe.Pointer(Input))
+		Output := C.CString(dnncfg.Detector.Output)
+		defer C.free(unsafe.Pointer(Output))
+		nsample := int(dnncfg.Detector.SampleRate)
+		threshold := dnncfg.Detector.Threshold
+
+		C.lpms_dnninit(model, Input, Output, C.int(nsample), C.float(threshold))
+		initengine = true
+	}
+}
+func ReleaseDnnEngine() {
+	if initengine == true {
+		C.lpms_dnnfree()
+	}
 }
