@@ -1495,7 +1495,7 @@ static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char
         return DNN_ERROR;
 
     av_freep(&tf_model->outputs);
-    tf_model->outputs = av_malloc_array(nb_output, sizeof(*tf_model->outputs));
+    tf_model->outputs = av_malloc_array(nb_output, sizeof(TF_Output));
     if (!tf_model->outputs)
         return DNN_ERROR;
     for (int i = 0; i < nb_output; ++i) {
@@ -1677,7 +1677,7 @@ void ff_dnn_free_model_tf(DNNModel **model)
     }
 }
 
-DNNModule *get_dnn_module(DNNBackendType backend_type)
+static DNNModule *get_dnn_module(DNNBackendType backend_type)
 {
     DNNModule *dnn_module;
 
@@ -1688,14 +1688,9 @@ DNNModule *get_dnn_module(DNNBackendType backend_type)
 
     switch(backend_type){
     case DNN_TF:
-    #if (CONFIG_LIBTENSORFLOW == 1)
         dnn_module->load_model = &ff_dnn_load_model_tf;
         dnn_module->execute_model = &ff_dnn_execute_model_tf;
         dnn_module->free_model = &ff_dnn_free_model_tf;
-    #else
-        av_freep(&dnn_module);
-        return NULL;
-    #endif
         break;
     default:
         av_log(NULL, AV_LOG_ERROR, "Module backend_type is not native or tensorflow\n");
@@ -1708,7 +1703,8 @@ DNNModule *get_dnn_module(DNNBackendType backend_type)
 
 static int copy_from_frame_to_dnn(LVPDnnContext *ctx, const AVFrame *frame)
 {
-    if(ctx == NULL || ctx->swscaleframe == 0 || ctx->sws_rgb_scale) return DNN_ERROR;
+    if(ctx == NULL || ctx->swscaleframe == NULL || 
+      ctx->sws_rgb_scale == NULL || ctx->sws_gray8_to_grayf32 == NULL) return DNN_ERROR;
 
     int bytewidth = av_image_get_linesize(ctx->swscaleframe->format, ctx->swscaleframe->width, 0);
     DNNData *dnn_input = &ctx->input;
@@ -1747,7 +1743,7 @@ static int copy_from_frame_to_dnn(LVPDnnContext *ctx, const AVFrame *frame)
 
 LVPDnnContext* pgdnncontext = NULL;
 
-int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfidence)
+static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfidence)
 { 
 
   char slvpinfo[256] = {0,};
@@ -1762,8 +1758,7 @@ int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfidence)
 
   dnn_result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
   if (dnn_result != DNN_SUCCESS){
-      av_log(ctx, AV_LOG_ERROR, "failed to execute model\n");
-      av_frame_free(&in);
+      av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
 
@@ -1984,8 +1979,10 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, float* porob)
         if(context->sws_rgb_scale == NULL || context->sws_gray8_to_grayf32 == NULL)
         {
           ret = prepare_sws_context(context,context->readframe,flagHW);
-          if(ret < 0)
+          if(ret < 0){
+            av_log(NULL, AV_LOG_INFO, "Can not create scale context!\n");
             break;
+          }
         }
         context->framenum ++;
         if(context->framenum % context->sample_rate == 0){
@@ -2031,6 +2028,9 @@ int   lpms_dnnnew()
 }
 int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold)
 {   
+    DNNReturnType result;
+    DNNData model_input;
+    int check;
   if(fmodelpath == NULL) return DNN_ERROR;
   if(pgdnncontext != NULL) return DNN_SUCCESS;
   
@@ -2045,41 +2045,41 @@ int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, f
 
 
     if (strlen(ctx->model_filename)<=0) {
-        av_log(ctx, AV_LOG_ERROR, "model file for network is not specified\n");
+        av_log(NULL, AV_LOG_ERROR, "model file for network is not specified\n");
         return AVERROR(EINVAL);
     }
     if (strlen(ctx->model_inputname)<=0) {
-        av_log(ctx, AV_LOG_ERROR, "input name of the model network is not specified\n");
+        av_log(NULL, AV_LOG_ERROR, "input name of the model network is not specified\n");
         return AVERROR(EINVAL);
     }
     if (strlen(ctx->model_outputname)<=0) {
-        av_log(ctx, AV_LOG_ERROR, "output name of the model network is not specified\n");
+        av_log(NULL, AV_LOG_ERROR, "output name of the model network is not specified\n");
         return AVERROR(EINVAL);
     }
 
-    if (!ctx->log_filename) {
-        av_log(ctx, AV_LOG_INFO, "output file for log is not specified\n");
+    if (strlen(ctx->log_filename)<=0) {
+        av_log(NULL, AV_LOG_INFO, "output file for log is not specified\n");
         //return AVERROR(EINVAL);
     }
 
     ctx->backend_type = 1;
     ctx->dnn_module = get_dnn_module(ctx->backend_type);
     if (!ctx->dnn_module) {
-        av_log(ctx, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
+        av_log(NULL, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
         return AVERROR(ENOMEM);
     }
     if (!ctx->dnn_module->load_model) {
-        av_log(ctx, AV_LOG_ERROR, "load_model for network is not specified\n");
+        av_log(NULL, AV_LOG_ERROR, "load_model for network is not specified\n");
         return AVERROR(EINVAL);
     }
 
     ctx->model = (ctx->dnn_module->load_model)(ctx->model_filename);
     if (!ctx->model) {
-        av_log(ctx, AV_LOG_ERROR, "could not load DNN model\n");
+        av_log(NULL, AV_LOG_ERROR, "could not load DNN model\n");
         return AVERROR(EINVAL);
     }
 
-    if(ctx->log_filename){        
+    if(strlen(ctx->log_filename) > 0){        
         ctx->logfile = fopen(ctx->log_filename, "w");
     }
     else{        
@@ -2089,13 +2089,9 @@ int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, f
     ctx->framenum = 0;
     //config input
 
-    DNNReturnType result;
-    DNNData model_input;
-    int check;
-
     result = ctx->model->get_input(ctx->model->model, &model_input, ctx->model_inputname);
     if (result != DNN_SUCCESS) {
-        av_log(ctx, AV_LOG_ERROR, "could not get input from the model\n");
+        av_log(NULL, AV_LOG_ERROR, "could not get input from the model\n");
         return AVERROR(EIO);
     }
 
@@ -2110,14 +2106,14 @@ int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, f
     
 
     if (result != DNN_SUCCESS) {
-        av_log(ctx, AV_LOG_ERROR, "could not set input and output for the model\n");
+        av_log(NULL, AV_LOG_ERROR, "could not set input and output for the model\n");
         return AVERROR(EIO);
     }
 
     // have a try run in case that the dnn model resize the frame
     result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
     if (result != DNN_SUCCESS){
-        av_log(ctx, AV_LOG_ERROR, "failed to execute model\n");
+        av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
         return AVERROR(EIO);
     }
     
@@ -2130,7 +2126,9 @@ void  lpms_dnnfree()
 
   if(context == NULL) return;
 
+  if(context->sws_rgb_scale)
   sws_freeContext(context->sws_rgb_scale);
+  if(context->sws_gray8_to_grayf32)
   sws_freeContext(context->sws_gray8_to_grayf32);  
 
   if (context->dnn_module)
@@ -2147,7 +2145,7 @@ void  lpms_dnnfree()
   if(context->swframeforHW)
       av_frame_free(&context->swframeforHW);
 
-  if(context->log_filename && context->logfile)
+  if(strlen(context->log_filename) > 0 && context->logfile)
   {
       fclose(context->logfile);
   }
