@@ -360,17 +360,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	glog.Infof("video confidence getting : %v", fconfidence)
 
 	if fconfidence > threshold {
-		srtname = /*".tmp/" + */ "subtitle.srt"
-		/*
-			srtfile, err := os.Create(srtname)
-			defer srtfile.Close()
-			if err == nil { //success
-				fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-				fmt.Fprint(srtfile, "Football Match!", "\n")
-			} else {
-				srtname = ""
-			}
-		*/
+		srtname = "subtitle.srt"
 	}
 
 	params := make([]C.output_params, len(ps))
