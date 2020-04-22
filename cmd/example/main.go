@@ -206,7 +206,16 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 	t := transcoder.NewFFMpegSegmentTranscoder(profiles, workDir)
 
 	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
-	
+
+	//create sutilte template
+	srtname := "subtitle.srt"
+	srtfile, err := os.Create(srtname)
+	if err == nil { //success
+		fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+		fmt.Fprint(srtfile, "Football Match!", "\n")
+		srtfile.Close()
+	}
+
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
 		//If we get a new video segment for the original HLS stream, do the transcoding.
 		glog.Infof("Got seg: %v %v\n", seg.Name, hlsStream.GetStreamID())
