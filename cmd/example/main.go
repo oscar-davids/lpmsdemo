@@ -206,25 +206,11 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 	t := transcoder.NewFFMpegSegmentTranscoder(profiles, workDir)
 
 	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
-
-	//Create variants in the stream
-
-	/*
-		strmIDs := make([]string, len(profiles), len(profiles))
-		for i, p := range profiles {
-			strmID := randString(10)
-			strmIDs[i] = strmID
-			//strmIDs[i] = p.Name
-			//pl, _ := m3u8.NewMediaPlaylist(100, 100)
-			//strm := hlsStream.NewBasicHLSVideoStream("test_s", DefaultHLSStreamWin)
-			//hlsStream.AddVideoStream(strm, &m3u8.Variant{URI: fmt.Sprintf("%v.m3u8", strmID), Chunklist: pl, VariantParams: transcoder.TranscodeProfileToVariantParams(p)})
-		}
-	*/
+	
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
 		//If we get a new video segment for the original HLS stream, do the transcoding.
 		glog.Infof("Got seg: %v %v\n", seg.Name, hlsStream.GetStreamID())
 		strmID := hlsStream.GetStreamID()
-		//if "transcodedc1ecb1b20c" != hlsStream.GetStreamID()
 		{
 			getfile := ".tmp/" + seg.Name
 			//Transcode stream
