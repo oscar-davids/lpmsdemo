@@ -1768,8 +1768,8 @@ static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfide
   //            
   //if(lendata >= 2 && pfdata[0] >= ctx->valid_threshold)
   {
-      *fconfidence = pfdata[0];
-      snprintf(slvpinfo, sizeof(slvpinfo), "probability %.2f", pfdata[0]);  
+      *fconfidence = pfdata[1];
+      //snprintf(slvpinfo, sizeof(slvpinfo), "probability %.2f", pfdata[0]);  
       
       //av_dict_set(metadata, "lavfi.lvpdnn.text", slvpinfo, 0);
       if(ctx->logfile)
@@ -1778,8 +1778,7 @@ static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfide
       }      
   }
   //for DEBUG
-  av_log(0, AV_LOG_INFO, "%d frame detected as %s confidence\n",ctx->framenum,slvpinfo);        
-
+  //av_log(0, AV_LOG_INFO, "%d frame detected as %s confidence\n",ctx->framenum,slvpinfo);
 
   if(ctx->logfile && ctx->framenum % 20 == 0)
       fflush(ctx->logfile);
@@ -2000,6 +1999,8 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, float* porob)
 
   if(count)
   	*porob = ftotal / count;
+
+  av_log(0, AV_LOG_ERROR, "Engine Probability = %f\n",*porob);
   
   //release frame and scale context
   if(context->readframe)
@@ -2037,6 +2038,9 @@ int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, f
   LVPDnnContext *ctx = (LVPDnnContext*)av_mallocz(sizeof(LVPDnnContext));
   pgdnncontext = ctx;
 
+  ctx->model_filename = (char*)malloc(MAXPATH);
+  ctx->model_inputname = (char*)malloc(MAXPATH);
+  ctx->model_outputname = (char*)malloc(MAXPATH);
   strcpy(ctx->model_filename,fmodelpath);
 	strcpy(ctx->model_inputname,input);
 	strcpy(ctx->model_outputname,output);
@@ -2150,6 +2154,12 @@ void  lpms_dnnfree()
       fclose(context->logfile);
   }
 
+  if(context->model_filename)
+    free(context->model_filename);
+  if(context->model_inputname)
+    free(context->model_inputname);
+  if(context->model_outputname)
+    free(context->model_outputname);
   if(pgdnncontext)
     av_free(pgdnncontext);
   pgdnncontext = NULL;

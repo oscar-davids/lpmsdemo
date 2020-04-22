@@ -52,7 +52,7 @@ var (
 	P144p30fps16x9 = VideoProfile{Name: "P144p30fps16x9", Bitrate: "400k", Framerate: 30, AspectRatio: "16:9", Resolution: "256x144"}
 	P144p25fps16x9 = VideoProfile{Name: "P144p25fps16x9", Bitrate: "400k", Framerate: 25, AspectRatio: "16:9", Resolution: "256x144"}
 	PDnnDetector   = VideoProfile{Name: "PDnnDetector", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 40, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape"}}
+		Detector: DetectorProfile{SampleRate: 80, ModelPath: "tmodel.pb", Threshold: 0.5, Input: "input_1", Output: "reshape_3/Reshape"}}
 )
 
 var VideoProfileLookup = map[string]VideoProfile{

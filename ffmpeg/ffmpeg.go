@@ -322,6 +322,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	}
 
 	var fconfidence float32 = 0.0
+	var threshold float32 = 0.0
 	var srtname string
 	if pdnn.Profile.Detector.SampleRate > 0 {
 		/*
@@ -332,6 +333,8 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 				return nil, err
 			}
 		*/
+
+		threshold = pdnn.Profile.Detector.Threshold
 
 		flagHW := 0
 		if input.Accel == Nvidia {
@@ -354,16 +357,20 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	//make srt format file
 	srtname = ""
 	//fconfidence = 1.0 //for test
-	if fconfidence > 0.0 {
+	glog.Infof("video confidence getting : %v", fconfidence)
+
+	if fconfidence > threshold {
 		srtname = /*".tmp/" + */ "subtitle.srt"
-		srtfile, err := os.Create(srtname)
-		defer srtfile.Close()
-		if err == nil { //success
-			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-			fmt.Fprint(srtfile, "Football Match!", "\n")
-		} else {
-			srtname = ""
-		}
+		/*
+			srtfile, err := os.Create(srtname)
+			defer srtfile.Close()
+			if err == nil { //success
+				fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+				fmt.Fprint(srtfile, "Football Match!", "\n")
+			} else {
+				srtname = ""
+			}
+		*/
 	}
 
 	params := make([]C.output_params, len(ps))

@@ -101,9 +101,9 @@ typedef struct LVPDnnContext {
 
     DNNBackendType backend_type;  //default tensorflow
     int     filter_type;          //classification, rect detection ...
-    char    model_filename[MAXPATH];    
-    char    model_inputname[MAXPATH];
-    char    model_outputname[MAXPATH];
+    char    *model_filename;    
+    char    *model_inputname;
+    char    *model_outputname;
     int     sample_rate;
     float   valid_threshold;
     char    log_filename[MAXPATH];
