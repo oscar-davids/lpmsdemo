@@ -1804,7 +1804,7 @@ static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelF
 {
     const enum AVPixelFormat *p;
 	//AVCodecContext *ctx = lvpctx->decoder_ctx;
-	if(ctx == NULL || pgdnncontext) return AV_PIX_FMT_NONE;
+	if(ctx == NULL || pgdnncontext == NULL) return AV_PIX_FMT_NONE;
 
     for (p = pix_fmts; *p != -1; p++) {
         if (*p == pgdnncontext->hw_pix_fmt)
@@ -1839,8 +1839,21 @@ static int prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW)
 
 	enum AVPixelFormat fmt = 0;
 	
-	if(flagHW)
-		fmt = ctx->hw_pix_fmt;
+	if(flagHW){	
+  	//fmt = ctx->hw_pix_fmt;
+    enum AVPixelFormat *formats;
+
+    ret = av_hwframe_transfer_get_formats(frame->hw_frames_ctx,
+                                        AV_HWFRAME_TRANSFER_DIRECTION_FROM,
+                                        &formats, 0);
+    if (ret < 0) {        
+        return ret;
+    }
+			
+	fmt = formats[0];                
+    av_freep(&formats);
+
+  }
 	else 
 		fmt = frame->format;
 	
