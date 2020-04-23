@@ -396,7 +396,15 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 			filters = fmt.Sprintf("fps=%d/1,", param.Framerate)
 		}
 		if fconfidence > 0.0 && len(srtname) > 0 {
-			filters += fmt.Sprintf("subtitles=%v,", srtname)
+			if input.Accel == Software {
+				filters += fmt.Sprintf("subtitles=%v,", srtname)				
+			} else {
+				filters += fmt.Sprintf("hwdownload,format=nv12,subtitles=%v,", srtname)			
+			}
+
+			if p.Accel == Nvidia {
+				filters += fmt.Sprintf("hwupload_cuda,")
+			}
 			//filters += "subtitles=subtitle.srt,"
 		}
 		filters += fmt.Sprintf("%s='w=if(gte(iw,ih),%d,-2):h=if(lt(iw,ih),%d,-2)'", scale_filter, w, h)
