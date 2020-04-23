@@ -358,7 +358,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	//make srt format file
 	srtname = ""
 	//fconfidence = 1.0 //for test
-	glog.Infof("video confidence getting : %v", fconfidence)
+	//glog.Infof("video confidence getting : %v", fconfidence)
 
 	if fconfidence > threshold {
 		srtname = "subtitle.srt"
