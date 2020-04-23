@@ -16,6 +16,7 @@ import (
 )
 
 // #cgo pkg-config: libavformat libavfilter libavcodec libavutil libswscale gnutls
+// #cgo LDFLAGS: -ltensorflow
 // #include <stdlib.h>
 // #include "lpms_ffmpeg.h"
 import "C"
