@@ -26,6 +26,8 @@ func main() {
 		}
 		return ffmpeg.Software, "sw"
 	}
+	dnnflag := false
+
 	str2profs := func(inp string) []ffmpeg.VideoProfile {
 		profs := []ffmpeg.VideoProfile{}
 		strs := strings.Split(inp, ",")
@@ -35,6 +37,9 @@ func main() {
 				panic(fmt.Sprintf("Invalid rendition %s. Valid renditions are:\n%s", k, validRenditions()))
 			}
 			profs = append(profs, p)
+			if k == "PDnnDetector" {
+				dnnflag = true
+			}
 		}
 		return profs
 	}
@@ -62,7 +67,16 @@ func main() {
 	}
 
 	ffmpeg.InitFFmpeg()
-	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+	if dnnflag == true {
+		ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+		srtname := "subtitle.srt"
+		srtfile, err := os.Create(srtname)
+		if err == nil { //success
+			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+			fmt.Fprint(srtfile, "Subtitle Test!", "\n")
+			srtfile.Close()
+		}
+	}
 
 	fmt.Printf("Setting fname %s encoding %d renditions with %v\n", fname, len(options), lbl)
 	res, err := ffmpeg.Transcode3(&ffmpeg.TranscodeOptionsIn{
