@@ -105,7 +105,7 @@ func main() {
 			hlsStrm.SetSubscriber(subscriber)
 			glog.Infof("After set subscriber")
 
-			opt := segmenter.SegmenterOptions{SegLength: 8 * time.Second}
+			opt := segmenter.SegmenterOptions{SegLength: 2 * time.Second}
 			var ctx context.Context
 			ctx, cancelSeg = context.WithCancel(context.Background())
 
