@@ -38,7 +38,7 @@ go build cmd/example/main.go
 
 If build successed, can find main execute file in lpmsdemo folder.
 
-For classification need to trained medel file. please change trained file(base on tensorflow)  to tmodel.pb  and copy in lpmsdemo folder, start server following command.
+For classification need to trained medel file. please change trained file(base on tensorflow)  to tmodel.pb  and copy in lpmsdemo folder, now can start server.
 
 ./main
 
