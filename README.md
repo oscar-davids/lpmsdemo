@@ -9,9 +9,9 @@ To try this project as a standalone service, follow the instructions below.
 
 ### Requirements
 
-Project requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build LPMS, the dependent libraries need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
+Project requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build project, the dependent libraries need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
   
-  remark: for use subtitle should be build ffmpeg with --enable-libass
+  remark: for use subtitle should be built ffmpeg with --enable-libass
 
 For classification need to install tensorflow. Because currently project use the tensorflow 1.15 version,if have GPU, need to install the CUDA 10.0 version additionally. For installation of tensorflow, refer to the following URL:
 
@@ -58,11 +58,17 @@ For OBS, fill in Settings->Stream->URL to be rtmp://localhost:1935
 I0324 09:44:14.639405   80673 listener.go:28] RTMP server got upstream
 I0324 09:44:14.639429   80673 listener.go:42] Got RTMP Stream: test
 ```
-4. If you have successfully classification one scene, you should see something like this in the output
+4. If you have successfully classification about scene, you should see something like this in the output
 
 ```
-I0324 09:44:14.639405   80673 listener.go:28] RTMP server got upstream
-I0324 09:44:14.639429   80673 listener.go:42] Got RTMP Stream: test
+Opening '/home/gpu-user/lpmsdemo/.tmp/fca11fb1bd091e944388.m3u8.tmp' for writing
+Got seg: fca11fb1bd091e944388_12.ts fca11fb1bd091e944388
+
+#Engine Probability = 0.800000
+
+Shaper: FriBidi 0.19.7 (SIMPLE) HarfBuzz-ng 1.7.2 (COMPLEX)
+Using font provider fontconfig
+
 ```
 
 
@@ -90,17 +96,15 @@ GPU_DEVICE=3 go test -tag nvidia -run Nvidia
 ```
 
 Aside from the tests themselves, there is a
-[sample program](https://github.com/livepeer/lpms/blob/master/cmd/transcoding/transcoding.go)
+[sample program](https://github.com/oscar-davids/lpmsdemo/blob/master/cmd/transcoding/transcoding.go)
 that can be used as a reference to the LPMS GPU transcoding API. The sample
 program can select GPU or software processing via CLI flags. Run the sample
 program via:
 
 ```
 # software processing
-go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,P240p30fps16x9 sw
+go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,PDnnDetector sw
 
 # nvidia processing, GPU number 2
-go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,P240p30fps16x9 nv 2
+go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,PDnnDetector nv 0
 ```
-
-You can follow the development of LPMS and Livepeer @ our [forum](http://forum.livepeer.org)
