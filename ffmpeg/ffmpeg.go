@@ -98,7 +98,7 @@ func Transcode(input string, workDir string, ps []VideoProfile) error {
 	opts := make([]TranscodeOptions, len(ps))
 	for i, param := range ps {
 		oname := path.Join(workDir, fmt.Sprintf("out%v%v", i, filepath.Base(input)))
-		oname = ".tmp/" + fmt.Sprintf("out%v%v", i, filepath.Base(input))
+		//oname = ".tmp/" + fmt.Sprintf("out%v%v", i, filepath.Base(input))
 		opt := TranscodeOptions{
 			Oname:   oname,
 			Profile: param,
