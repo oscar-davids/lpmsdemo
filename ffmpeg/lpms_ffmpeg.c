@@ -1768,7 +1768,7 @@ static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfide
   //            
   //if(lendata >= 2 && pfdata[0] >= ctx->valid_threshold)
   {
-      *fconfidence = pfdata[1];
+      *fconfidence = pfdata[0];
       //snprintf(slvpinfo, sizeof(slvpinfo), "probability %.2f", pfdata[0]);  
       
       //av_dict_set(metadata, "lavfi.lvpdnn.text", slvpinfo, 0);
