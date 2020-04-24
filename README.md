@@ -11,11 +11,12 @@ To try this project as a standalone service, follow the instructions below.
 
 Project requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build project, the dependent libraries need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
   
-  remark: for use subtitle should be built ffmpeg with --enable-libass
+  remark: for use subtitle ffmpeg should be built with --enable-libass
 
 For classification need to install tensorflow. Because currently project use the tensorflow 1.15 version,if have GPU, need to install the CUDA 10.0 version additionally. For installation of tensorflow, refer to the following URL:
 
  https://www.tensorflow.org/install/install_c
+ 
  https://www.tensorflow.org/install/gpu
  
 For build the project need to install golang.
@@ -37,9 +38,12 @@ go build cmd/example/main.go
 
 If build successed, can find main execute file in lpmsdemo folder.
 
-For classification need to trained medel file. please change trained file(base on tensorflow)  to tmodel.pb  and copy in lpmsdemo folder.
+For classification need to trained medel file. please change trained file(base on tensorflow)  to tmodel.pb  and copy in lpmsdemo folder, start server following command.
+
+./main
 
 The test server exposes a few different endpoints:
+
 1. `rtmp://localhost:1935/stream/test` for uploading/viewing RTMP video stream.
 2. `http://localhost:7935/stream/test2.m3u8` for verification classification the HLS video stream.
 
