@@ -77,7 +77,10 @@ func main() {
 	var hlsStrm stream.HLSVideoStream
 	var manifest stream.HLSVideoManifest
 	var cancelSeg context.CancelFunc
-
+	
+	//loading dnnmodule only once
+	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+	
 	lpms.HandleRTMPPublish(
 		//makeStreamID (give the stream an ID)
 		func(url *url.URL) stream.AppData {
@@ -205,8 +208,6 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 	workDir := ".tmp/"
 	t := transcoder.NewFFMpegSegmentTranscoder(profiles, workDir)
 
-	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
-
 	//create sutilte template
 	srtname := "subtitle.srt"
 	srtfile, err := os.Create(srtname)
@@ -233,7 +234,6 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 				{
 					glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[0]), strmID)
 					sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
-					glog.Infof("Inserting transcoded seg %v into strm: %v", sName)
 
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[0], Duration: 8}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
