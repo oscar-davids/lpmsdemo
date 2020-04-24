@@ -18,7 +18,7 @@ For classification need to install tensorflow. Because currently project use the
  https://www.tensorflow.org/install/install_c
  https://www.tensorflow.org/install/gpu
  
-Install go
+For build the project need to install golang.
 
 https://golang.org/doc/install
 
