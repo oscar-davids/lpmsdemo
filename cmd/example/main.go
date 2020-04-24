@@ -231,11 +231,14 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 
 				//Insert into HLS stream
 				//for i, strmID := range strmIDs
-				{
-					glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[0]), strmID)
+				for i, p := range profiles {
+					if p.Name == "PDnnDetector" {
+						continue
+					}				
+					glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
 					sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
 
-					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[0], Duration: 8}); err != nil {
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 8}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				}
