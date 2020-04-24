@@ -25,6 +25,10 @@ https://golang.org/doc/install
 
 ### Build 
 
+check PKG_CONFIG_PATH environment value.
+
+export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:$HOME/compiled/lib/pkgconfig"
+
 ```
 git clone https://github.com/oscar-davids/lpmsdemo.git 
 
