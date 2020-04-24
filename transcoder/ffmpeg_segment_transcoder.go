@@ -30,9 +30,12 @@ func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, error) {
 	}
 
 	dout := make([][]byte, len(t.tProfiles), len(t.tProfiles))
-	for i, _ := range t.tProfiles {
+	for i, p := range t.tProfiles {
 		ofile := path.Join(t.workDir, fmt.Sprintf("out%v%v", i, filepath.Base(fname)))
 		//ofile = ".tmp/" + fmt.Sprintf("out%v%v", i, filepath.Base(fname))
+		if p.Name == "PDnnDetector" {
+			continue
+		}
 		d, err := ioutil.ReadFile(ofile)
 		if err != nil {
 			glog.Errorf("Cannot read transcode output: %v", err)
