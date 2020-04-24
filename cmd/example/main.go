@@ -213,7 +213,7 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 	srtfile, err := os.Create(srtname)
 	if err == nil { //success
 		fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-		fmt.Fprint(srtfile, "Football Match!", "\n")
+		fmt.Fprint(srtfile, "adult content!", "\n")
 		srtfile.Close()
 	}
 
