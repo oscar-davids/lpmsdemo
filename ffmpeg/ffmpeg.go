@@ -92,6 +92,7 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 	return nil
 }
 
+//call subscriber 
 func Transcode(input string, workDir string, ps []VideoProfile) error {
 
 	opts := make([]TranscodeOptions, len(ps))
@@ -101,13 +102,13 @@ func Transcode(input string, workDir string, ps []VideoProfile) error {
 		opt := TranscodeOptions{
 			Oname:   oname,
 			Profile: param,
-			Accel:   Software,
+			Accel:   Nvidia,
 		}
 		opts[i] = opt
 	}
 	inopts := &TranscodeOptionsIn{
 		Fname: input,
-		Accel: Software,
+		Accel: Nvidia,
 	}
 	return Transcode2(inopts, opts)
 }
