@@ -60,10 +60,10 @@ type LPMSOpts struct {
 
 func defaultLPMSOpts(opts *LPMSOpts) {
 	if opts.RtmpAddr == "" {
-		opts.RtmpAddr = "127.0.0.1:1935"
+		opts.RtmpAddr = "0.0.0.0:1935"
 	}
 	if opts.HttpAddr == "" {
-		opts.HttpAddr = "127.0.0.1:7935"
+		opts.HttpAddr = "0.0.0.0:7935"
 	}
 }
 
