@@ -1,37 +1,50 @@
-[![Build Status](https://circleci.com/gh/livepeer/lpms.svg?style=shield&circle-token=e33534f6f4e2a6af19bb1596d7b72767a246cbab)](https://circleci.com/gh/livepeer/lpms/tree/master)
 
-# LPMS - Livepeer media server
+# LPMS - Livepeer media server for scene classification 
 
-LPMS is a media server that can run independently, or on top of the [Livepeer](https://livepeer.org) 
-network.  It allows you to manipulate / broadcast a live video stream.  Currently, LPMS supports RTMP
-as input format and RTMP/HLS as output formats.
+This project is the [lpms](https://github.com/livepeer/lpms) fork project for scene classification.
 
-LPMS can be integrated into another service, or run as a standalone service.  To try LPMS as a 
-standalone service, simply get the package:
-```
-go get -d github.com/livepeer/lpms/cmd/example
-```
+GPU is recommended for real-time scene classification and transcoding.
 
-Go to the lpms root directory at `$GOPATH/src/github.com/livepeer/lpms`. If needed, install the required dependencies; see the Requirements section below. Then build the sample app and run it:
-
-```
-go build cmd/example/main.go
-./example
-```
+To try this project as a standalone service, follow the instructions below.
 
 ### Requirements
 
-LPMS requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build LPMS, the dependent libraries need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
+Project requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build LPMS, the dependent libraries need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
+  
+  remark: for use subtitle should be build ffmpeg with --enable-libass
 
-Running golang unit tests (`test.sh`) requires the `ffmpeg` and `ffprobe` executables in addition to the libraries. However, none of these are run-time requirements; the executables are not used outside of testing, and the libraries are statically linked by default. Note that dynamic linking may substantially speed up rebuilds if doing heavy development.
+For classification need to install tensorflow. Because currently project use the tensorflow 1.15 version,if have GPU, need to install the CUDA 10.0 version additionally. For installation of tensorflow, refer to the following URL:
 
-### Testing out LPMS
+ https://www.tensorflow.org/install/install_c
+ https://www.tensorflow.org/install/gpu
+ 
+Install go
 
-The test LPMS server exposes a few different endpoints:
+https://golang.org/doc/install
+
+### Build 
+
+```
+git clone https://github.com/oscar-davids/lpmsdemo.git 
+
+cd lpmsdemo
+
+go build cmd/example/main.go
+
+```
+
+### Testing for classification
+
+If build successed, can find main execute file in lpmsdemo folder.
+
+For classification need to trained medel file. please change trained file(base on tensorflow)  to tmodel.pb  and copy in lpmsdemo folder.
+
+The test server exposes a few different endpoints:
 1. `rtmp://localhost:1935/stream/test` for uploading/viewing RTMP video stream.
-2. `http://localhost:7935/stream/test_hls.m3u8` for consuming the HLS video stream.
+2. `http://localhost:7935/stream/test2.m3u8` for verification classification the HLS video stream.
 
 Do the following steps to view a live stream video:
+
 1. Start LPMS by running `go run cmd/example/main.go`
 
 2. Upload an RTMP video stream to `rtmp://localhost:1935/stream/test`.  We recommend using ffmpeg or [OBS](https://obsproject.com/download).
@@ -45,91 +58,15 @@ For OBS, fill in Settings->Stream->URL to be rtmp://localhost:1935
 I0324 09:44:14.639405   80673 listener.go:28] RTMP server got upstream
 I0324 09:44:14.639429   80673 listener.go:42] Got RTMP Stream: test
 ```
-4. Now you have a RTMP video stream running, we can view it from the server.  Simply run `ffplay http://localhost:7935/stream/test.m3u8`, you should see the hls video playback.
+4. If you have successfully classification one scene, you should see something like this in the output
 
-
-### Integrating LPMS
-
-LPMS exposes a few different methods for customization. As an example, take a look at `cmd/main.go`.
-
-To create a new LPMS server:
 ```
-// Specify ports you want the server to run on, and the working directory for
-// temporary files. See `core/lpms.go` for a full list of LPMSOpts
-opts := lpms.LPMSOpts {
-    RtmpAddr: "127.0.0.1:1935",
-    HttpAddr: "127.0.0.1:7935",
-    WorkDir:  "/tmp"
-}
-lpms := lpms.New(&opts)
+I0324 09:44:14.639405   80673 listener.go:28] RTMP server got upstream
+I0324 09:44:14.639429   80673 listener.go:42] Got RTMP Stream: test
 ```
 
-To handle RTMP publish:
-```
-	lpms.HandleRTMPPublish(
-		//getStreamID
-		func(url *url.URL) (strmID string) {
-			return getStreamIDFromPath(reqPath)
-		},
-		//getStream
-		func(url *url.URL, rtmpStrm stream.RTMPVideoStream) (err error) {
-			return nil
-		},
-		//finishStream
-		func(url *url.URL, rtmpStrm stream.RTMPVideoStream) (err error) {
-			return nil
-		})
-```
 
-To handle RTMP playback:
-```
-	lpms.HandleRTMPPlay(
-		//getStream
-		func(ctx context.Context, reqPath string, dst av.MuxCloser) error {
-			glog.Infof("Got req: ", reqPath)
-			streamID := getStreamIDFromPath(reqPath)
-			src := streamDB.db[streamID]
-
-			if src != nil {
-				src.ReadRTMPFromStream(ctx, dst)
-			} else {
-				glog.Error("Cannot find stream for ", streamID)
-				return stream.ErrNotFound
-			}
-			return nil
-		})
-```
-
-To handle HLS playback:
-```
-	lpms.HandleHLSPlay(
-		//getHLSBuffer
-		func(reqPath string) (*stream.HLSBuffer, error) {
-			streamID := getHLSStreamIDFromPath(reqPath)
-			buffer := bufferDB.db[streamID]
-			s := streamDB.db[streamID]
-
-			if s == nil {
-				return nil, stream.ErrNotFound
-			}
-
-			if buffer == nil {
-				//Create the buffer and start copying the stream into the buffer
-				buffer = stream.NewHLSBuffer()
-				bufferDB.db[streamID] = buffer
-
-                //Subscribe to the stream
-				sub := stream.NewStreamSubscriber(s)
-				go sub.StartHLSWorker(context.Background())
-				err := sub.SubscribeHLS(streamID, buffer)
-				if err != nil {
-					return nil, stream.ErrStreamSubscriber
-				}
-			}
-
-			return buffer, nil
-		})
-```
+5. Now you have a RTMP video stream running, we can view it from the server.  Simply run `ffplay http://localhost:7935/stream/test2.m3u8`, you should see the hls video playback.
 
 ### GPU Support
 
