@@ -238,7 +238,7 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 					glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
 					sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
 
-					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 8}); err != nil {
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 2}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				}
