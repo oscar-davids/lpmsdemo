@@ -14,6 +14,7 @@ type DetectorProfile struct {
 	Threshold  float32
 	Input      string
 	Output     string
+	DetectFlag int
 }
 
 //Standard Profiles:
@@ -52,7 +53,7 @@ var (
 	P144p30fps16x9 = VideoProfile{Name: "P144p30fps16x9", Bitrate: "400k", Framerate: 30, AspectRatio: "16:9", Resolution: "256x144"}
 	P144p25fps16x9 = VideoProfile{Name: "P144p25fps16x9", Bitrate: "400k", Framerate: 25, AspectRatio: "16:9", Resolution: "256x144"}
 	PDnnDetector   = VideoProfile{Name: "PDnnDetector", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape"}}
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape", DetectFlag: 0}}
 )
 
 var VideoProfileLookup = map[string]VideoProfile{

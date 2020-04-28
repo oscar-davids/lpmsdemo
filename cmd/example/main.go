@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +63,19 @@ func getHLSSegmentName(url *url.URL) string {
 }
 
 func main() {
+
+	var flagClass int = 0
+	if len(os.Args) > 2 {
+		panic("Usage: <input file> <0 or number for classification>")
+	}
+	if len(os.Args) == 2 {
+		ninput, err := strconv.Atoi(os.Args[1])
+		if err != nil {
+			panic("Error getting classication number")
+		}
+		flagClass = ninput
+	}
+
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
@@ -77,10 +91,8 @@ func main() {
 	var hlsStrm stream.HLSVideoStream
 	var manifest stream.HLSVideoManifest
 	var cancelSeg context.CancelFunc
-	
 	//loading dnnmodule only once
 	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
-	
 	lpms.HandleRTMPPublish(
 		//makeStreamID (give the stream an ID)
 		func(url *url.URL) stream.AppData {
@@ -98,7 +110,7 @@ func main() {
 			hlsStrm = stream.NewBasicHLSVideoStream(randString(10), 3)
 
 			var subscriber func(*stream.HLSSegment, bool)
-			subscriber, err = transcode(hlsStrm)
+			subscriber, err = transcode(hlsStrm, flagClass)
 			if err != nil {
 				glog.Errorf("Error transcoding: %v", err)
 			}
@@ -197,7 +209,7 @@ func main() {
 	lpms.Start(context.Background())
 }
 
-func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool), error) {
+func transcode(hlsStream stream.HLSVideoStream, flagclass int) (func(*stream.HLSSegment, bool), error) {
 	//Create Transcoder
 	profiles := []ffmpeg.VideoProfile{
 		ffmpeg.P720p25fps16x9,
@@ -208,12 +220,25 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 	workDir := ".tmp/"
 	t := transcoder.NewFFMpegSegmentTranscoder(profiles, workDir)
 
+	for i, p := range profiles {
+		if p.Name == "PDnnDetector" {
+			profiles[i].Detector.DetectFlag = flagclass
+			continue
+		}
+	}
+
 	//create sutilte template
 	srtname := "subtitle.srt"
 	srtfile, err := os.Create(srtname)
 	if err == nil { //success
 		fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-		fmt.Fprint(srtfile, "adult content!", "\n")
+		if flagclass == 0 {
+			fmt.Fprint(srtfile, "adult content!", "\n")
+		} else if flagclass == 1 {
+			fmt.Fprint(srtfile, "football match!", "\n")
+		} else {
+			fmt.Fprint(srtfile, " ", "\n")
+		}
 		srtfile.Close()
 	}
 
@@ -234,7 +259,7 @@ func transcode(hlsStream stream.HLSVideoStream) (func(*stream.HLSSegment, bool),
 				for i, p := range profiles {
 					if p.Name == "PDnnDetector" {
 						continue
-					}				
+					}
 					glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
 					sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
 

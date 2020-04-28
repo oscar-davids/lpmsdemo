@@ -143,7 +143,7 @@ typedef struct LVPDnnContext {
 int   	lpms_dnnnew();
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 void  	lpms_dnnfree();
-int  	lpms_dnnexecute(char* ivpath, int  flagHW, float* porob);
+int  	lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float* porob);
 
 #endif
 #endif // _LPMS_FFMPEG_H_

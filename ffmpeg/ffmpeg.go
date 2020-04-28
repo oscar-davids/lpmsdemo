@@ -92,7 +92,7 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 	return nil
 }
 
-//call subscriber 
+//call subscriber
 func Transcode(input string, workDir string, ps []VideoProfile) error {
 
 	opts := make([]TranscodeOptions, len(ps))
@@ -344,7 +344,8 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		}
 
 		prob := C.float(fconfidence)
-		C.lpms_dnnexecute(fname, C.int(flagHW), &prob)
+		flagclass := C.int(pdnn.Profile.Detector.DetectFlag)
+		C.lpms_dnnexecute(fname, C.int(flagHW), flagclass, &prob)
 		fconfidence = float32(prob)
 
 		if len(ps) == 0 {
@@ -398,9 +399,9 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		}
 		if fconfidence > 0.0 && len(srtname) > 0 {
 			if input.Accel == Software {
-				filters += fmt.Sprintf("subtitles=%v,", srtname)				
+				filters += fmt.Sprintf("subtitles=%v,", srtname)
 			} else {
-				filters += fmt.Sprintf("hwdownload,format=nv12,subtitles=%v,", srtname)			
+				filters += fmt.Sprintf("hwdownload,format=nv12,subtitles=%v,", srtname)
 			}
 
 			if p.Accel == Nvidia {

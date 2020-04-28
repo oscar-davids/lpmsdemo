@@ -1743,7 +1743,7 @@ static int copy_from_frame_to_dnn(LVPDnnContext *ctx, const AVFrame *frame)
 
 LVPDnnContext* pgdnncontext = NULL;
 
-static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfidence)
+static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in,int flagclass, float *fconfidence)
 { 
 
   char slvpinfo[256] = {0,};
@@ -1766,9 +1766,9 @@ static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfide
   float* pfdata = dnn_output->data;
   int lendata = ctx->output.height;
   //            
-  //if(lendata >= 2 && pfdata[0] >= ctx->valid_threshold)
+  if(flagclass >= 0 && flagclass < lendata /*&& pfdata[0] >= ctx->valid_threshold*/)
   {
-      *fconfidence = pfdata[0];
+      *fconfidence = pfdata[flagclass];
       //snprintf(slvpinfo, sizeof(slvpinfo), "probability %.2f", pfdata[0]);  
       
       //av_dict_set(metadata, "lavfi.lvpdnn.text", slvpinfo, 0);
@@ -1777,6 +1777,10 @@ static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in, float *fconfide
           fprintf(ctx->logfile,"%s\n",slvpinfo);                
       }      
   }
+  else {
+    av_log(0, AV_LOG_INFO, "invalid classification numbel %d\n",flagclass);
+  }
+  
   //for DEBUG
   //av_log(0, AV_LOG_INFO, "%d frame detected as %s confidence\n",ctx->framenum,slvpinfo);
 
@@ -1899,7 +1903,7 @@ static int prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW)
 }
 
 
-int  lpms_dnnexecute(char* ivpath, int  flagHW, float* porob)
+int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float* porob)
 {
 	char sdevicetype[64] = {0,};
 	int	 ret, i;
@@ -1998,7 +2002,7 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, float* porob)
         }
         context->framenum ++;
         if(context->framenum % context->sample_rate == 0){
-          dnnresult = lpms_detectoneframe(context,context->readframe,&fconfidence);
+          dnnresult = lpms_detectoneframe(context,context->readframe,flagclass,&fconfidence);
           if(dnnresult == DNN_SUCCESS){
             count++;
             ftotal += fconfidence;
