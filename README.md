@@ -1,25 +1,27 @@
 
 # LPMS - Livepeer media server for scene classification 
 
-This project is the [lpms](https://github.com/livepeer/lpms) fork project for scene classification.
+This proof of concept is a [lpms](https://github.com/livepeer/lpms) fork project to enable scene classification in LPMS
 
-GPU is recommended for real-time scene classification and transcoding.
+A Nvidia GPU (pascal or higher) is needed for real-time scene classification and transcoding.
 
 To try this project as a standalone service, follow the instructions below.
 
+You can load any trained classifier and get a propability result during the livestream encoding. 
+
 ### Requirements
 
-Project requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build project, the dependent libraries need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
+Project requires libavcodec (ffmpeg) and friends. See `install_ffmpeg.sh` . Running this script will install everything in `~/compiled`. In order to build the project, the dependent libraries will need to be discoverable by pkg-config and golang. If you installed everything with `install_ffmpeg.sh` , then run `export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig:$PKG_CONFIG_PATH` so the deps are picked up.
   
-  remark: for use subtitle ffmpeg should be built with --enable-libass
+  remark: For rapid quality assurance we offer use of burned in subtitle. To use this ffmpeg should be built with --enable-libass
 
-For classification need to install tensorflow. Because currently project use the tensorflow 1.15 version,if have GPU, need to install the CUDA 10.0 version additionally. For installation of tensorflow, refer to the following URL:
+For the classification need to install tensorflow 1.15 and CUDA 10.0. 
 
  https://www.tensorflow.org/install/install_c
  
  https://www.tensorflow.org/install/gpu
  
-For build the project need to install golang.
+To build the project, you need to install golang.
 
 https://golang.org/doc/install
 
@@ -40,9 +42,9 @@ go build cmd/example/main.go
 
 ### Testing for classification
 
-If build successed, can find main execute file in lpmsdemo folder.
+If the build successed, you can find the main execute file in the lpmsdemo folder.
 
-For classification need to trained medel file. please change trained file(base on tensorflow)  to tmodel.pb  and copy in lpmsdemo folder, now can start server.
+For classification needs a trained model file. Please change trained filename(base on tensorflow)  to tmodel.pb  and copy it to the lpmsdemo folder, now you can start the lpms server.
 
 ./main
 
@@ -66,7 +68,7 @@ For OBS, fill in Settings->Stream->URL to be rtmp://localhost:1935
 I0324 09:44:14.639405   80673 listener.go:28] RTMP server got upstream
 I0324 09:44:14.639429   80673 listener.go:42] Got RTMP Stream: test
 ```
-4. If you have successfully classification about scene, you should see something like this in the output
+4. If you have scene classification successfully running, you should see something like this in the output
 
 ```
 Opening '/home/gpu-user/lpmsdemo/.tmp/fca11fb1bd091e944388.m3u8.tmp' for writing
