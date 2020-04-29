@@ -1988,7 +1988,6 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
   }  
   int nsamplerate = (int)(frmarate * tinteval);
   if(nsamplerate == 0) nsamplerate = context->sample_rate;
-  
 	context->readframe = av_frame_alloc();
 
 	while (ret >= 0) {
@@ -2049,11 +2048,18 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
 
 	return DNN_SUCCESS;
 }
-
-int   lpms_dnnnew()
+LVPDnnContext*  lpms_dnnnew()
 {
-  return 0;
+  LVPDnnContext *ctx = (LVPDnnContext*)av_mallocz(sizeof(LVPDnnContext));
+  return ctx;
 }
+void lpms_dnnstop(LVPDnnContext* context)
+{
+  //for test
+  pgdnncontext = context;
+  lpms_dnnfree();
+}
+
 int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold)
 {   
     DNNReturnType result;

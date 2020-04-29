@@ -140,7 +140,9 @@ typedef struct LVPDnnContext {
 } LVPDnnContext;
 
 
-int   	lpms_dnnnew();
+LVPDnnContext*  lpms_dnnnew();
+void lpms_dnnstop(LVPDnnContext* context);
+
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 void  	lpms_dnnfree();
 int  	lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass,float  tinteval, float* porob);

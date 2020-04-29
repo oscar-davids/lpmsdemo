@@ -548,3 +548,19 @@ func ReleaseDnnEngine() {
 		C.lpms_dnnfree()
 	}
 }
+
+type DnnFilter struct {
+	handle  *C.LVPDnnContext
+	initdnn bool
+	stopped bool
+	mu      *sync.Mutex
+}
+
+func NewDnnFilter() *DnnFilter {
+	return &DnnFilter{
+		handle:  C.lpms_dnnnew(),
+		initdnn: false,
+		stopped: true,
+		mu:      &sync.Mutex{},
+	}
+}
