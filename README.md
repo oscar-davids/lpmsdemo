@@ -49,6 +49,7 @@ For classification needs a trained model file. Please change trained filename(ba
 ./main or ./main -classid=1 -interval=1.5
 
   classid : class id for classification
+  
   interval: time intervals(unit second) for classification
 
 
