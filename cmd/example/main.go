@@ -61,6 +61,15 @@ func getHLSSegmentName(url *url.URL) string {
 	}
 	return segName
 }
+func getRTMPRequestName(url *url.URL) string {
+	var reqName string
+	regex, _ := regexp.Compile("\\/stream\\/.*")
+	match := regex.FindString(url.Path)
+	if match != "" {
+		reqName = strings.Replace(match, "/stream/", "", -1)
+	}
+	return reqName
+}
 
 func main() {
 
@@ -103,7 +112,8 @@ func main() {
 		//gotStream
 		func(url *url.URL, rs stream.RTMPVideoStream) (err error) {
 			//Store the stream
-			glog.Infof("Got RTMP stream: %v", rs.GetStreamID())
+			reqName := getRTMPRequestName(url)
+			glog.Infof("Got RTMP stream: %v %v %v", url.Path, reqName, rs.GetStreamID())
 			rtmpStrm = rs
 
 			// //Segment the video into HLS (If we need multiple outlets for the HLS stream, we'd need to create a buffer.  But here we only have one outlet for the transcoder)
@@ -129,7 +139,7 @@ func main() {
 			}()
 			glog.Infof("HLS StreamID: %v", hlsStrm.GetStreamID())
 
-			mid := "test2" //randString(10)
+			mid := reqName + "_classified"
 			manifest = stream.NewBasicHLSVideoManifest(mid)
 			pl, _ := hlsStrm.GetStreamPlaylist()
 			variant := &m3u8.Variant{URI: fmt.Sprintf("%v.m3u8", mid), Chunklist: pl, VariantParams: m3u8.VariantParams{}}
