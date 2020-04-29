@@ -77,14 +77,14 @@ func main() {
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: <input file> -classid=0 -interval=1.5")
+		panic("Usage sample: appname -classid=0 -interval=1.5")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
 			continue
 		}
 		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 {
-			panic("Usage sample: <input file> -classid=0 -interval=1.5")
+			panic("Usage sample: appname -classid=0 -interval=1.5")
 		}
 	}
 
