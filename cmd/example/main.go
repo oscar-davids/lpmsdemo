@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -71,18 +70,22 @@ func getRTMPRequestName(url *url.URL) string {
 	return reqName
 }
 
+//main -classid=0 -interval=1.0
 func main() {
 
-	var flagClass int = 0
-	if len(os.Args) > 2 {
-		panic("Usage: <input file> <0 or number for classification>")
+	flagClass := flag.Int("classid", 0, "class id for classification")
+	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
+	flag.Parse()
+	if flag.Parsed() == false || *interval <= float64(0.0) {
+		panic("Usage sample: <input file> -classid=0 -interval=1.5")
 	}
-	if len(os.Args) == 2 {
-		ninput, err := strconv.Atoi(os.Args[1])
-		if err != nil {
-			panic("Error getting classication number")
+	for i, s := range os.Args {
+		if i == 0 {
+			continue
 		}
-		flagClass = ninput
+		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 {
+			panic("Usage sample: <input file> -classid=0 -interval=1.5")
+		}
 	}
 
 	flag.Set("logtostderr", "true")
@@ -120,7 +123,7 @@ func main() {
 			hlsStrm = stream.NewBasicHLSVideoStream(randString(10), 3)
 
 			var subscriber func(*stream.HLSSegment, bool)
-			subscriber, err = transcode(hlsStrm, flagClass)
+			subscriber, err = transcode(hlsStrm, *flagClass, *interval)
 			if err != nil {
 				glog.Errorf("Error transcoding: %v", err)
 			}
@@ -219,7 +222,7 @@ func main() {
 	lpms.Start(context.Background())
 }
 
-func transcode(hlsStream stream.HLSVideoStream, flagclass int) (func(*stream.HLSSegment, bool), error) {
+func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64) (func(*stream.HLSSegment, bool), error) {
 	//Create Transcoder
 	profiles := []ffmpeg.VideoProfile{
 		ffmpeg.P720p25fps16x9,
@@ -232,7 +235,8 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int) (func(*stream.HLS
 
 	for i, p := range profiles {
 		if p.Name == "PDnnDetector" {
-			profiles[i].Detector.DetectFlag = flagclass
+			profiles[i].Detector.ClassID = flagclass
+			profiles[i].Detector.Interval = float32(tinterval)
 			continue
 		}
 	}

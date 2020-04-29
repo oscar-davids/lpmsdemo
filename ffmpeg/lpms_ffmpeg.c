@@ -1903,7 +1903,7 @@ static int prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW)
 }
 
 
-int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float* porob)
+int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,float* porob)
 {
 	char sdevicetype[64] = {0,};
 	int	 ret, i;
@@ -1978,6 +1978,16 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float* porob)
 	int ngotframe = 0;
   float fconfidence ,ftotal = 0.0;
   int dnnresult, count = 0;
+
+  /*determine sample rate according to input video's frame rate*/
+  float frmarate = 1.0;
+  if(video->r_frame_rate.den > 0.0){
+    frmarate = av_q2d(video->r_frame_rate);
+  } else  {
+    frmarate = 1.0 / av_q2d(video->time_base);    
+  }  
+  int nsamplerate = (int)(frmarate * tinteval);
+  if(nsamplerate == 0) nsamplerate = context->sample_rate;
   
 	context->readframe = av_frame_alloc();
 
@@ -2001,7 +2011,7 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float* porob)
           }
         }
         context->framenum ++;
-        if(context->framenum % context->sample_rate == 0){
+        if(context->framenum % nsamplerate == 0){
           dnnresult = lpms_detectoneframe(context,context->readframe,flagclass,&fconfidence);
           if(dnnresult == DNN_SUCCESS){
             count++;
@@ -2017,7 +2027,7 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float* porob)
   if(count)
   	*porob = ftotal / count;
 
-  av_log(0, AV_LOG_ERROR, "Engine Probability = %f\n",*porob);
+  av_log(0, AV_LOG_INFO, "Engine Probability = %f\n",*porob);
   
   //release frame and scale context
   if(context->readframe)

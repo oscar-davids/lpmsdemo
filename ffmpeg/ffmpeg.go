@@ -344,8 +344,9 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		}
 
 		prob := C.float(fconfidence)
-		flagclass := C.int(pdnn.Profile.Detector.DetectFlag)
-		C.lpms_dnnexecute(fname, C.int(flagHW), flagclass, &prob)
+		flagclass := C.int(pdnn.Profile.Detector.ClassID)
+		tinterval := C.float(pdnn.Profile.Detector.Interval)
+		C.lpms_dnnexecute(fname, C.int(flagHW), flagclass, tinterval, &prob)
 		fconfidence = float32(prob)
 
 		if len(ps) == 0 {
