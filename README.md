@@ -46,7 +46,11 @@ If the build successed, you can find the main execute file in the lpmsdemo folde
 
 For classification needs a trained model file. Please change trained filename(base on tensorflow)  to tmodel.pb  and copy it to the lpmsdemo folder, now you can start the lpms server.
 
-./main or ./main 1 (classification id, default id is 0)
+./main or ./main -classid=1 -interval=1.5
+
+  classid : class id for classification
+  interval: time intervals(unit second) for classification
+
 
 The test server exposes a few different endpoints:
 
