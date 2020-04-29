@@ -51,7 +51,10 @@ For classification needs a trained model file. Please change trained filename(ba
 The test server exposes a few different endpoints:
 
 1. `rtmp://localhost:1935/stream/test` for uploading/viewing RTMP video stream.
-2. `http://localhost:7935/stream/test2.m3u8` for verification classification the HLS video stream.
+2. `http://localhost:7935/stream/test_classified.m3u8` for verification classification the HLS video stream.
+
+  remark: can check deterministic streamname with postfix "_classified" for the classifier output
+
 
 Do the following steps to view a live stream video:
 
