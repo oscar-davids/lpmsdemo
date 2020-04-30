@@ -1854,7 +1854,7 @@ static int prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW)
         return ret;
     }
 			
-	fmt = formats[0];                
+	  fmt = formats[0];                
     av_freep(&formats);
 
   }
@@ -1921,23 +1921,23 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
 	}
 
 	/* open the input file */
-    if (avformat_open_input(&context->input_ctx, ivpath, NULL, NULL) != 0) {
-        fprintf(stderr, "Cannot open input file '%s'\n", ivpath);
-        return DNN_ERROR;
-    }
+  if (avformat_open_input(&context->input_ctx, ivpath, NULL, NULL) != 0) {
+      fprintf(stderr, "Cannot open input file '%s'\n", ivpath);
+      return DNN_ERROR;
+  }
 
-    if (avformat_find_stream_info(context->input_ctx, NULL) < 0) {
-        fprintf(stderr, "Cannot find input stream information.\n");
-        return DNN_ERROR;
-    }
+  if (avformat_find_stream_info(context->input_ctx, NULL) < 0) {
+      fprintf(stderr, "Cannot find input stream information.\n");
+      return DNN_ERROR;
+  }
 
-    /* find the video stream information */
-    ret = av_find_best_stream(context->input_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &context->decoder, 0);
-    if (ret < 0) {
-        fprintf(stderr, "Cannot find a video stream in the input file\n");
-        return DNN_ERROR;
-    }
-    context->video_stream = ret;
+  /* find the video stream information */
+  ret = av_find_best_stream(context->input_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &context->decoder, 0);
+  if (ret < 0) {
+      fprintf(stderr, "Cannot find a video stream in the input file\n");
+      return DNN_ERROR;
+  }
+  context->video_stream = ret;
 	
 	if(flagHW){
 		for (i = 0;; i++) {
@@ -2050,9 +2050,9 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
 
 int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold)
 {   
-    DNNReturnType result;
-    DNNData model_input;
-    int check;
+  DNNReturnType result;
+  DNNData model_input;
+  int check;
   if(fmodelpath == NULL) return DNN_ERROR;
   if(pgdnncontext != NULL) return DNN_SUCCESS;
   
@@ -2069,80 +2069,80 @@ int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, f
   ctx->valid_threshold = fthreshold;
 
 
-    if (strlen(ctx->model_filename)<=0) {
-        av_log(NULL, AV_LOG_ERROR, "model file for network is not specified\n");
-        return AVERROR(EINVAL);
-    }
-    if (strlen(ctx->model_inputname)<=0) {
-        av_log(NULL, AV_LOG_ERROR, "input name of the model network is not specified\n");
-        return AVERROR(EINVAL);
-    }
-    if (strlen(ctx->model_outputname)<=0) {
-        av_log(NULL, AV_LOG_ERROR, "output name of the model network is not specified\n");
-        return AVERROR(EINVAL);
-    }
+  if (strlen(ctx->model_filename)<=0) {
+      av_log(NULL, AV_LOG_ERROR, "model file for network is not specified\n");
+      return AVERROR(EINVAL);
+  }
+  if (strlen(ctx->model_inputname)<=0) {
+      av_log(NULL, AV_LOG_ERROR, "input name of the model network is not specified\n");
+      return AVERROR(EINVAL);
+  }
+  if (strlen(ctx->model_outputname)<=0) {
+      av_log(NULL, AV_LOG_ERROR, "output name of the model network is not specified\n");
+      return AVERROR(EINVAL);
+  }
 
-    if (strlen(ctx->log_filename)<=0) {
-        av_log(NULL, AV_LOG_INFO, "output file for log is not specified\n");
-        //return AVERROR(EINVAL);
-    }
+  if (strlen(ctx->log_filename)<=0) {
+      av_log(NULL, AV_LOG_INFO, "output file for log is not specified\n");
+      //return AVERROR(EINVAL);
+  }
 
-    ctx->backend_type = 1;
-    ctx->dnn_module = get_dnn_module(ctx->backend_type);
-    if (!ctx->dnn_module) {
-        av_log(NULL, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
-        return AVERROR(ENOMEM);
-    }
-    if (!ctx->dnn_module->load_model) {
-        av_log(NULL, AV_LOG_ERROR, "load_model for network is not specified\n");
-        return AVERROR(EINVAL);
-    }
+  ctx->backend_type = 1;
+  ctx->dnn_module = get_dnn_module(ctx->backend_type);
+  if (!ctx->dnn_module) {
+      av_log(NULL, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
+      return AVERROR(ENOMEM);
+  }
+  if (!ctx->dnn_module->load_model) {
+      av_log(NULL, AV_LOG_ERROR, "load_model for network is not specified\n");
+      return AVERROR(EINVAL);
+  }
 
-    ctx->model = (ctx->dnn_module->load_model)(ctx->model_filename);
-    if (!ctx->model) {
-        av_log(NULL, AV_LOG_ERROR, "could not load DNN model\n");
-        return AVERROR(EINVAL);
-    }
+  ctx->model = (ctx->dnn_module->load_model)(ctx->model_filename);
+  if (!ctx->model) {
+      av_log(NULL, AV_LOG_ERROR, "could not load DNN model\n");
+      return AVERROR(EINVAL);
+  }
 
-    if(strlen(ctx->log_filename) > 0){        
-        ctx->logfile = fopen(ctx->log_filename, "w");
-    }
-    else{        
-        ctx->logfile = NULL;
-    }
+  if(strlen(ctx->log_filename) > 0){        
+      ctx->logfile = fopen(ctx->log_filename, "w");
+  }
+  else{        
+      ctx->logfile = NULL;
+  }
 
-    ctx->framenum = 0;
-    //config input
+  ctx->framenum = 0;
+  //config input
 
-    result = ctx->model->get_input(ctx->model->model, &model_input, ctx->model_inputname);
-    if (result != DNN_SUCCESS) {
-        av_log(NULL, AV_LOG_ERROR, "could not get input from the model\n");
-        return AVERROR(EIO);
-    }
+  result = ctx->model->get_input(ctx->model->model, &model_input, ctx->model_inputname);
+  if (result != DNN_SUCCESS) {
+      av_log(NULL, AV_LOG_ERROR, "could not get input from the model\n");
+      return AVERROR(EIO);
+  }
 
-    ctx->input.width    = model_input.width;
-    ctx->input.height   = model_input.height;
-    ctx->input.channels = model_input.channels;
-    ctx->input.dt = model_input.dt;
+  ctx->input.width    = model_input.width;
+  ctx->input.height   = model_input.height;
+  ctx->input.channels = model_input.channels;
+  ctx->input.dt = model_input.dt;
 
-    result = (ctx->model->set_input_output)(ctx->model->model,
-                                        &ctx->input, ctx->model_inputname,
-                                        (const char **)&ctx->model_outputname, 1);
-    
+  result = (ctx->model->set_input_output)(ctx->model->model,
+                                      &ctx->input, ctx->model_inputname,
+                                      (const char **)&ctx->model_outputname, 1);
+  
 
-    if (result != DNN_SUCCESS) {
-        av_log(NULL, AV_LOG_ERROR, "could not set input and output for the model\n");
-        return AVERROR(EIO);
-    }
+  if (result != DNN_SUCCESS) {
+      av_log(NULL, AV_LOG_ERROR, "could not set input and output for the model\n");
+      return AVERROR(EIO);
+  }
 
-    // have a try run in case that the dnn model resize the frame
-    result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
-    if (result != DNN_SUCCESS){
-        av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
-        return AVERROR(EIO);
-    }
-    
-    return DNN_SUCCESS;
+  // have a try run in case that the dnn model resize the frame
+  result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
+  if (result != DNN_SUCCESS){
+      av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
+      return AVERROR(EIO);
+  }
+  
+  return DNN_SUCCESS;
 }
 
 void  lpms_dnnfree()
@@ -2205,80 +2205,80 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
   ctx->valid_threshold = fthreshold;
 
 
-    if (strlen(ctx->model_filename)<=0) {
-        av_log(NULL, AV_LOG_ERROR, "model file for network is not specified\n");
-        return AVERROR(EINVAL);
-    }
-    if (strlen(ctx->model_inputname)<=0) {
-        av_log(NULL, AV_LOG_ERROR, "input name of the model network is not specified\n");
-        return AVERROR(EINVAL);
-    }
-    if (strlen(ctx->model_outputname)<=0) {
-        av_log(NULL, AV_LOG_ERROR, "output name of the model network is not specified\n");
-        return AVERROR(EINVAL);
-    }
+  if (strlen(ctx->model_filename)<=0) {
+      av_log(NULL, AV_LOG_ERROR, "model file for network is not specified\n");
+      return AVERROR(EINVAL);
+  }
+  if (strlen(ctx->model_inputname)<=0) {
+      av_log(NULL, AV_LOG_ERROR, "input name of the model network is not specified\n");
+      return AVERROR(EINVAL);
+  }
+  if (strlen(ctx->model_outputname)<=0) {
+      av_log(NULL, AV_LOG_ERROR, "output name of the model network is not specified\n");
+      return AVERROR(EINVAL);
+  }
 
-    if (strlen(ctx->log_filename)<=0) {
-        av_log(NULL, AV_LOG_INFO, "output file for log is not specified\n");
-        //return AVERROR(EINVAL);
-    }
+  if (strlen(ctx->log_filename)<=0) {
+      av_log(NULL, AV_LOG_INFO, "output file for log is not specified\n");
+      //return AVERROR(EINVAL);
+  }
 
-    ctx->backend_type = 1;
-    ctx->dnn_module = get_dnn_module(ctx->backend_type);
-    if (!ctx->dnn_module) {
-        av_log(NULL, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
-        return AVERROR(ENOMEM);
-    }
-    if (!ctx->dnn_module->load_model) {
-        av_log(NULL, AV_LOG_ERROR, "load_model for network is not specified\n");
-        return AVERROR(EINVAL);
-    }
+  ctx->backend_type = 1;
+  ctx->dnn_module = get_dnn_module(ctx->backend_type);
+  if (!ctx->dnn_module) {
+      av_log(NULL, AV_LOG_ERROR, "could not create DNN module for requested backend\n");
+      return AVERROR(ENOMEM);
+  }
+  if (!ctx->dnn_module->load_model) {
+      av_log(NULL, AV_LOG_ERROR, "load_model for network is not specified\n");
+      return AVERROR(EINVAL);
+  }
 
-    ctx->model = (ctx->dnn_module->load_model)(ctx->model_filename);
-    if (!ctx->model) {
-        av_log(NULL, AV_LOG_ERROR, "could not load DNN model\n");
-        return AVERROR(EINVAL);
-    }
+  ctx->model = (ctx->dnn_module->load_model)(ctx->model_filename);
+  if (!ctx->model) {
+      av_log(NULL, AV_LOG_ERROR, "could not load DNN model\n");
+      return AVERROR(EINVAL);
+  }
 
-    if(strlen(ctx->log_filename) > 0){        
-        ctx->logfile = fopen(ctx->log_filename, "w");
-    }
-    else{        
-        ctx->logfile = NULL;
-    }
+  if(strlen(ctx->log_filename) > 0){        
+      ctx->logfile = fopen(ctx->log_filename, "w");
+  }
+  else{        
+      ctx->logfile = NULL;
+  }
 
-    ctx->framenum = 0;
-    //config input
+  ctx->framenum = 0;
+  //config input
 
-    result = ctx->model->get_input(ctx->model->model, &model_input, ctx->model_inputname);
-    if (result != DNN_SUCCESS) {
-        av_log(NULL, AV_LOG_ERROR, "could not get input from the model\n");
-        return AVERROR(EIO);
-    }
+  result = ctx->model->get_input(ctx->model->model, &model_input, ctx->model_inputname);
+  if (result != DNN_SUCCESS) {
+      av_log(NULL, AV_LOG_ERROR, "could not get input from the model\n");
+      return AVERROR(EIO);
+  }
 
-    ctx->input.width    = model_input.width;
-    ctx->input.height   = model_input.height;
-    ctx->input.channels = model_input.channels;
-    ctx->input.dt = model_input.dt;
+  ctx->input.width    = model_input.width;
+  ctx->input.height   = model_input.height;
+  ctx->input.channels = model_input.channels;
+  ctx->input.dt = model_input.dt;
 
-    result = (ctx->model->set_input_output)(ctx->model->model,
-                                        &ctx->input, ctx->model_inputname,
-                                        (const char **)&ctx->model_outputname, 1);
-    
+  result = (ctx->model->set_input_output)(ctx->model->model,
+                                      &ctx->input, ctx->model_inputname,
+                                      (const char **)&ctx->model_outputname, 1);
+  
 
-    if (result != DNN_SUCCESS) {
-        av_log(NULL, AV_LOG_ERROR, "could not set input and output for the model\n");
-        return AVERROR(EIO);
-    }
+  if (result != DNN_SUCCESS) {
+      av_log(NULL, AV_LOG_ERROR, "could not set input and output for the model\n");
+      return AVERROR(EIO);
+  }
 
-    // have a try run in case that the dnn model resize the frame
-    result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
-    if (result != DNN_SUCCESS){
-        av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
-        return AVERROR(EIO);
-    }
-    
-    return DNN_SUCCESS;
+  // have a try run in case that the dnn model resize the frame
+  result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
+  if (result != DNN_SUCCESS){
+      av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
+      return AVERROR(EIO);
+  }
+  av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
+  return DNN_SUCCESS;
 }
 
 void  lpms_dnnfreewithctx(LVPDnnContext *context)
@@ -2356,20 +2356,20 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
     }
     context->video_stream = ret;
 	
-	if(flagHW){
+	if(flagHW) {
 		for (i = 0;; i++) {
-	        const AVCodecHWConfig *config = avcodec_get_hw_config(context->decoder, i);
-	        if (!config) {
-	            fprintf(stderr, "Decoder %s does not support device type %s.\n",
-	                    context->decoder->name, av_hwdevice_get_type_name(context->type));
-	            return -1;
-	        }
-	        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
-	            config->device_type == context->type) {
-	            context->hw_pix_fmt = config->pix_fmt;
-	            break;
-	        }
-    	}
+        const AVCodecHWConfig *config = avcodec_get_hw_config(context->decoder, i);
+        if (!config) {
+            fprintf(stderr, "Decoder %s does not support device type %s.\n",
+                    context->decoder->name, av_hwdevice_get_type_name(context->type));
+            return -1;
+        }
+        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+            config->device_type == context->type) {
+            context->hw_pix_fmt = config->pix_fmt;
+            break;
+      } 
+    }
 	}	
 	if (!(context->decoder_ctx = avcodec_alloc_context3(context->decoder)))
 			return AVERROR(ENOMEM);
