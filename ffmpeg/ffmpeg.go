@@ -549,12 +549,15 @@ func ReleaseDnnEngine() {
 	}
 }
 
+//for multiple model
 type DnnFilter struct {
 	handle  *C.LVPDnnContext
 	initdnn bool
 	stopped bool
 	mu      *sync.Mutex
 }
+
+var dnnfilters []DnnFilter
 
 func NewDnnFilter() *DnnFilter {
 	return &DnnFilter{
@@ -563,4 +566,51 @@ func NewDnnFilter() *DnnFilter {
 		stopped: true,
 		mu:      &sync.Mutex{},
 	}
+}
+func RegistryDnnEngine(dnncfg VideoProfile) {
+
+	dnnfilter := NewDnnFilter()
+	if dnnfilter.InitDnnFilter(dnncfg) == true {
+		dnnfilters = append(dnnfilters, *dnnfilter)
+	}
+}
+func RemoveAllDnnEngine() {
+	for _, filter := range dnnfilters {
+		filter.StopDnnFilter()
+	}
+}
+func (t *DnnFilter) InitDnnFilter(dnncfg VideoProfile) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.initdnn {
+		return true
+	}
+	model := C.CString(dnncfg.Detector.ModelPath)
+	defer C.free(unsafe.Pointer(model))
+	Input := C.CString(dnncfg.Detector.Input)
+	defer C.free(unsafe.Pointer(Input))
+	Output := C.CString(dnncfg.Detector.Output)
+	defer C.free(unsafe.Pointer(Output))
+	nsample := int(dnncfg.Detector.SampleRate)
+	threshold := dnncfg.Detector.Threshold
+
+	res := C.lpms_dnninitwithctx(t.handle, model, Input, Output, C.int(nsample), C.float(threshold))
+	if res == 0 {
+		t.initdnn = true
+		t.stopped = false
+		return true
+	} else {
+		return false
+	}
+}
+func (t *DnnFilter) StopDnnFilter() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.stopped {
+		return
+	}
+	C.lpms_dnnstop(t.handle)
+	t.handle = nil
+	t.stopped = true
+	t.initdnn = false
 }

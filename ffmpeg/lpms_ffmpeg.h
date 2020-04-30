@@ -139,13 +139,15 @@ typedef struct LVPDnnContext {
 
 } LVPDnnContext;
 
-
-LVPDnnContext*  lpms_dnnnew();
-void lpms_dnnstop(LVPDnnContext* context);
-
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 void  	lpms_dnnfree();
 int  	lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass,float  tinteval, float* porob);
+
+//added for multibple model
+LVPDnnContext*  lpms_dnnnew();
+int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
+int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, int  flagclass, float  tinteval,float* porob);
+void lpms_dnnstop(LVPDnnContext* context);
 
 #endif
 #endif // _LPMS_FFMPEG_H_
