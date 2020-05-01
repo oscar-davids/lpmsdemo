@@ -46,7 +46,7 @@ If the build successed, you can find the main execute file in the lpmsdemo folde
 
 For classification needs a trained model file. Please change trained filename(base on tensorflow)  to tmodel.pb  and copy it to the lpmsdemo folder, now you can start the lpms server.
 
-./main or ./main -classid=1 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFlt
+./main or ./main -classid=1 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter
 
     classid : class id for classification
   
