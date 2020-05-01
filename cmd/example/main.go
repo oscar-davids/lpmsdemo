@@ -81,7 +81,7 @@ func validDnnfilters() []string {
 	return valids
 }
 
-//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFlt
+//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter
 func main() {
 
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")

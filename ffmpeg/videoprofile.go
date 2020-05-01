@@ -57,27 +57,27 @@ var (
 	PDnnDetector   = VideoProfile{Name: "PDnnDetector", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
 		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, ClassName: []string{"adult", "football match"}}}
-	PDnnOtherFlt = VideoProfile{Name: "PDnnOtherFlt", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
+	PDnnOtherFilter = VideoProfile{Name: "PDnnOtherFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
 		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel2.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, ClassName: []string{"adult", "football match"}}}
 )
 
 var VideoProfileLookup = map[string]VideoProfile{
-	"P720p60fps16x9": P720p60fps16x9,
-	"P720p30fps16x9": P720p30fps16x9,
-	"P720p25fps16x9": P720p25fps16x9,
-	"P720p30fps4x3":  P720p30fps4x3,
-	"P576p30fps16x9": P576p30fps16x9,
-	"P576p25fps16x9": P576p25fps16x9,
-	"P360p30fps16x9": P360p30fps16x9,
-	"P360p25fps16x9": P360p25fps16x9,
-	"P360p30fps4x3":  P360p30fps4x3,
-	"P240p30fps16x9": P240p30fps16x9,
-	"P240p25fps16x9": P240p25fps16x9,
-	"P240p30fps4x3":  P240p30fps4x3,
-	"P144p30fps16x9": P144p30fps16x9,
-	"PDnnDetector":   PDnnDetector,
-	"PDnnOtherFlt":   PDnnOtherFlt,
+	"P720p60fps16x9":  P720p60fps16x9,
+	"P720p30fps16x9":  P720p30fps16x9,
+	"P720p25fps16x9":  P720p25fps16x9,
+	"P720p30fps4x3":   P720p30fps4x3,
+	"P576p30fps16x9":  P576p30fps16x9,
+	"P576p25fps16x9":  P576p25fps16x9,
+	"P360p30fps16x9":  P360p30fps16x9,
+	"P360p25fps16x9":  P360p25fps16x9,
+	"P360p30fps4x3":   P360p30fps4x3,
+	"P240p30fps16x9":  P240p30fps16x9,
+	"P240p25fps16x9":  P240p25fps16x9,
+	"P240p30fps4x3":   P240p30fps4x3,
+	"P144p30fps16x9":  P144p30fps16x9,
+	"PDnnDetector":    PDnnDetector,
+	"PDnnOtherFilter": PDnnOtherFilter,
 }
 
 func VideoProfileResolution(p VideoProfile) (int, int, error) {
