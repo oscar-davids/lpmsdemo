@@ -16,6 +16,7 @@ type DetectorProfile struct {
 	Output     string
 	ClassID    int
 	Interval   float32
+	ClassName  []string
 }
 
 //Standard Profiles:
@@ -54,7 +55,11 @@ var (
 	P144p30fps16x9 = VideoProfile{Name: "P144p30fps16x9", Bitrate: "400k", Framerate: 30, AspectRatio: "16:9", Resolution: "256x144"}
 	P144p25fps16x9 = VideoProfile{Name: "P144p25fps16x9", Bitrate: "400k", Framerate: 25, AspectRatio: "16:9", Resolution: "256x144"}
 	PDnnDetector   = VideoProfile{Name: "PDnnDetector", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape", ClassID: 0}}
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
+			ClassID: 0, ClassName: []string{"adult", "football match"}}}
+	PDnnOtherFlt = VideoProfile{Name: "PDnnOtherFlt", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel2.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
+			ClassID: 0, ClassName: []string{"adult", "football match"}}}
 )
 
 var VideoProfileLookup = map[string]VideoProfile{
@@ -72,6 +77,7 @@ var VideoProfileLookup = map[string]VideoProfile{
 	"P240p30fps4x3":  P240p30fps4x3,
 	"P144p30fps16x9": P144p30fps16x9,
 	"PDnnDetector":   PDnnDetector,
+	"PDnnOtherFlt":   PDnnOtherFlt,
 }
 
 func VideoProfileResolution(p VideoProfile) (int, int, error) {

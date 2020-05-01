@@ -70,23 +70,53 @@ func getRTMPRequestName(url *url.URL) string {
 	return reqName
 }
 
-//main -classid=0 -interval=1.0
+func validDnnfilters() []string {
+	valids := make([]string, len(ffmpeg.VideoProfileLookup))
+	for p, _ := range ffmpeg.VideoProfileLookup {
+		if strings.Index(p, "PDnn") < 0 {
+			continue
+		}
+		valids = append(valids, p)
+	}
+	return valids
+}
+
+//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFlt
 func main() {
 
+	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
 	flagClass := flag.Int("classid", 0, "class id for classification")
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -classid=0 -interval=1.5")
+		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
 			continue
 		}
-		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 {
-			panic("Usage sample: appname -classid=0 -interval=1.5")
+		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-dnnfilter=") < 0 {
+			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector")
 		}
 	}
+	//check dnnfilter
+	str2filters := func(inp string) []ffmpeg.VideoProfile {
+		filters := []ffmpeg.VideoProfile{}
+		strs := strings.Split(inp, ",")
+		for _, k := range strs {
+			if strings.Index(k, "PDnn") < 0 {
+				continue
+			}
+			p, ok := ffmpeg.VideoProfileLookup[k]
+			if !ok {
+				panic(fmt.Sprintf("Invalid DnnFilter %s. Valid DnnFilters are:\n%s", k, validDnnfilters()))
+			}
+			filters = append(filters, p)
+		}
+		return filters
+	}
+
+	dnnfilters := str2filters(*strfilters)
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -104,7 +134,18 @@ func main() {
 	var manifest stream.HLSVideoManifest
 	var cancelSeg context.CancelFunc
 	//loading dnnmodule only once
-	ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+	//ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+	//Register Dnn filter into Transcode Engine
+	for i, ft := range dnnfilters {
+		if i == 0 {
+			ft.Detector.ClassID = *flagClass
+		}
+		ft.Detector.Interval = float32(*interval)
+
+		glog.Infof("Registry DnnEngine: %v", ft.Name)
+		ffmpeg.RegistryDnnEngine(ft)
+	}
+
 	lpms.HandleRTMPPublish(
 		//makeStreamID (give the stream an ID)
 		func(url *url.URL) stream.AppData {

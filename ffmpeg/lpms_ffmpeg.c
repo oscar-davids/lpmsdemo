@@ -1742,6 +1742,7 @@ static int copy_from_frame_to_dnn(LVPDnnContext *ctx, const AVFrame *frame)
 }
 
 LVPDnnContext* pgdnncontext = NULL;
+static enum AVPixelFormat hw_pix_fmt = AV_PIX_FMT_NONE;
 
 static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in,int flagclass, float *fconfidence)
 { 
@@ -1789,6 +1790,42 @@ static int  lpms_detectoneframe(LVPDnnContext *ctx, AVFrame *in,int flagclass, f
       
   return dnn_result;
 }
+static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
+{   
+  int dnn_result;
+  if(ctx == NULL) return DNN_ERROR;
+  //ctx->framenum = 1;
+  //if(ctx->sample_rate > 0 && ctx->framenum % ctx->sample_rate == 0 &&
+  //  copy_from_frame_to_dnn(ctx, in) == DNN_SUCCESS)
+
+  if(copy_from_frame_to_dnn(ctx, in) != DNN_SUCCESS) return DNN_ERROR;
+
+  dnn_result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
+  if (dnn_result != DNN_SUCCESS){
+      av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
+      return AVERROR(EIO);
+  }
+  /*
+  char slvpinfo[256] = {0,};
+  float* pfdata = ctx->output.data;
+  int lendata = ctx->output.height;
+
+  //get confidence order  
+  for (int i = 0; i < lendata; i++)
+  {
+      if(pfdata[i] > *fconfidence) {
+        *fconfidence = pfdata[i];
+        *classid = i;
+      }
+  }  
+  //for DEBUG
+  //av_log(0, AV_LOG_INFO, "classification id confidence = %d %f\n",*classid,*fconfidence);
+  //need some code for metadata
+  //if(ctx->logfile && ctx->framenum % 20 == 0)
+  //    fflush(ctx->logfile);
+  */  
+  return dnn_result;
+}
 
 static int hw_decoder_init(LVPDnnContext* lvpctx, const enum AVHWDeviceType type)
 {
@@ -1807,11 +1844,12 @@ static int hw_decoder_init(LVPDnnContext* lvpctx, const enum AVHWDeviceType type
 static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat *pix_fmts)
 {
     const enum AVPixelFormat *p;
-	//AVCodecContext *ctx = lvpctx->decoder_ctx;
-	if(ctx == NULL || pgdnncontext == NULL) return AV_PIX_FMT_NONE;
+	//AVCodecContext *ctx = lvpctx->decoder_ctx; 
+	//if(ctx == NULL || pgdnncontext == NULL) return AV_PIX_FMT_NONE;
+  if(ctx == NULL || hw_pix_fmt == AV_PIX_FMT_NONE) return AV_PIX_FMT_NONE;
 
     for (p = pix_fmts; *p != -1; p++) {
-        if (*p == pgdnncontext->hw_pix_fmt)
+        if (*p == hw_pix_fmt)
             return *p;
     }
 
@@ -1949,7 +1987,8 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
 	        }
 	        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
 	            config->device_type == context->type) {
-	            context->hw_pix_fmt = config->pix_fmt;
+	            //context->hw_pix_fmt = config->pix_fmt;
+              hw_pix_fmt = config->pix_fmt;
 	            break;
 	        }
     	}
@@ -1987,10 +2026,10 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
   }  
   int nsamplerate = (int)(frmarate * tinteval);
   if(nsamplerate == 0) nsamplerate = context->sample_rate;
+
 	context->readframe = av_frame_alloc();
 
-	while (ret >= 0) {
-
+  while (ret >= 0) {
 		if ((ret = av_read_frame(context->input_ctx, &packet)) < 0)
 	    	break;
 
@@ -2277,7 +2316,7 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
       av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
-  av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
+  //av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
   return DNN_SUCCESS;
 }
 
@@ -2320,7 +2359,7 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
   context = NULL;
     
 }
-int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, int  flagclass, float  tinteval,float* porob)
+int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob)
 {
 	char sdevicetype[64] = {0,};
 	int	 ret, i;
@@ -2330,6 +2369,7 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
 	if(context == NULL || ivpath == NULL) return DNN_ERROR;	
 
 	*porob = 0.0;
+  *classid = -1;
 
 	if(flagHW){
 		strcpy(sdevicetype,"cuda");
@@ -2366,7 +2406,8 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
         }
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
             config->device_type == context->type) {
-            context->hw_pix_fmt = config->pix_fmt;
+            //context->hw_pix_fmt = config->pix_fmt;
+            hw_pix_fmt = config->pix_fmt;
             break;
       } 
     }
@@ -2391,8 +2432,7 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
 
 	/* actual decoding and dump the raw data */
 	context->framenum = 0;
-	int ngotframe = 0;
-  float fconfidence ,ftotal = 0.0;
+	int ngotframe = 0;  
   int dnnresult, count = 0;
 
   /*determine sample rate according to input video's frame rate*/
@@ -2405,6 +2445,10 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
   int nsamplerate = (int)(frmarate * tinteval);
   if(nsamplerate == 0) nsamplerate = context->sample_rate;
 	context->readframe = av_frame_alloc();
+
+  int   classnum = context->output.height;
+  float *confidences = malloc(sizeof(float)*classnum);
+  memset(confidences,0x00,sizeof(float)*classnum);
 
 	while (ret >= 0) {
 
@@ -2427,10 +2471,15 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
         }
         context->framenum ++;
         if(context->framenum % nsamplerate == 0){
-          dnnresult = lpms_detectoneframe(context,context->readframe,flagclass,&fconfidence);
+          dnnresult = lpms_detectoneframewithctx(context,context->readframe);
           if(dnnresult == DNN_SUCCESS){
-            count++;
-            ftotal += fconfidence;
+            count++;            
+            float* pfdata = (float*)context->output.data;            
+            for (int k = 0; k < classnum; k++)
+            {
+              confidences[k] += pfdata[k];
+            }
+            
           }
         }
 			  av_frame_unref(context->readframe);
@@ -2439,11 +2488,23 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int  flagHW, i
 	    av_packet_unref(&packet);
 	}
 
-  if(count)
-  	*porob = ftotal / count;
+   //get confidence order  
+  for (int i = 0; i < classnum; i++)
+  {
+      if(confidences[i] > *porob) {
+        *porob = confidences[i];
+        *classid = i;
+      }
+  }  
 
-  av_log(0, AV_LOG_INFO, "Engine Probability = %f\n",*porob);
+  if(count > 1) {
+  	*porob = *porob / (float)count;
+  } 
+
+  av_log(0, AV_LOG_ERROR, "Engine Classid & Probability = %d %f\n",*classid, *porob);
   
+  if(confidences)
+    free(confidences);
   //release frame and scale context
   if(context->readframe)
 		  av_frame_free(&context->readframe);

@@ -68,14 +68,8 @@ func main() {
 
 	ffmpeg.InitFFmpeg()
 	if dnnflag == true {
-		ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
-		srtname := "subtitle.srt"
-		srtfile, err := os.Create(srtname)
-		if err == nil { //success
-			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-			fmt.Fprint(srtfile, "Subtitle Test!", "\n")
-			srtfile.Close()
-		}
+		//ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
+		ffmpeg.RegistryDnnEngine(ffmpeg.PDnnDetector)
 	}
 
 	fmt.Printf("Setting fname %s encoding %d renditions with %v\n", fname, len(options), lbl)
@@ -90,5 +84,10 @@ func main() {
 	fmt.Printf("profile=input frames=%v pixels=%v conference=%v\n", res.Decoded.Frames, res.Decoded.Pixels, res.DetectProb)
 	for i, r := range res.Encoded {
 		fmt.Printf("profile=%v frames=%v pixels=%v\n", profiles[i].Name, r.Frames, r.Pixels)
+	}
+
+	if dnnflag == true {
+		//ffmpeg.ReleaseDnnEngine()
+		ffmpeg.RemoveAllDnnEngine()
 	}
 }

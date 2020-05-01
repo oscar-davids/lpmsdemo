@@ -73,6 +73,17 @@ type TranscodeResults struct {
 	DetectProb float32
 }
 
+//for multiple model
+type DnnFilter struct {
+	handle  *C.LVPDnnContext
+	initdnn bool
+	stopped bool
+	mu      *sync.Mutex
+	dnncfg  VideoProfile
+}
+
+var dnnfilters []DnnFilter
+
 func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs string, seg_start int) error {
 	inp := C.CString(localRTMPUrl)
 	outp := C.CString(outM3U8)
@@ -324,47 +335,86 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	}
 
 	var fconfidence float32 = 0.0
-	var threshold float32 = 0.0
-	var srtname string
-	if pdnn.Profile.Detector.SampleRate > 0 {
-		/*
-			gdetector := NewTranscoder()
-			defer gdetector.StopTranscoder()
-			fconfidence, err = gdetector.Detector(input, pdnn)
-			if err != nil {
-				return nil, err
+	var srtname string = ""
+	/*
+			var threshold float32 = 0.0
+			if pdnn.Profile.Detector.SampleRate > 0 {
+
+				//gdetector := NewTranscoder()
+				//defer gdetector.StopTranscoder()
+				//fconfidence, err = gdetector.Detector(input, pdnn)
+				//if err != nil {
+				//	return nil, err
+				//}
+
+				threshold = pdnn.Profile.Detector.Threshold
+
+				flagHW := 0
+				if input.Accel == Nvidia {
+					flagHW = 1
+				}
+
+				prob := C.float(fconfidence)
+				flagclass := C.int(pdnn.Profile.Detector.ClassID)
+				tinterval := C.float(pdnn.Profile.Detector.Interval)
+				C.lpms_dnnexecute(fname, C.int(flagHW), flagclass, tinterval, &prob)
+				fconfidence = float32(prob)
+
+				if len(ps) == 0 {
+					tr := make([]MediaInfo, 1)
+					dec := MediaInfo{
+						Frames: int(1),
+						Pixels: int64(1000),
+					}
+					return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
+				}
 			}
-		*/
+		//make srt format file
+		srtname = ""
+		//fconfidence = 1.0 //for test
+		//glog.Infof("video confidence getting : %v", fconfidence)
 
-		threshold = pdnn.Profile.Detector.Threshold
-
-		flagHW := 0
-		if input.Accel == Nvidia {
-			flagHW = 1
+		if fconfidence > threshold {
+			srtname = "subtitle.srt"
 		}
-
-		prob := C.float(fconfidence)
-		flagclass := C.int(pdnn.Profile.Detector.ClassID)
-		tinterval := C.float(pdnn.Profile.Detector.Interval)
-		C.lpms_dnnexecute(fname, C.int(flagHW), flagclass, tinterval, &prob)
-		fconfidence = float32(prob)
-
-		if len(ps) == 0 {
-			tr := make([]MediaInfo, 1)
-			dec := MediaInfo{
-				Frames: int(1),
-				Pixels: int64(1000),
-			}
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
-		}
-	}
+	*/
 	//make srt format file
-	srtname = ""
-	//fconfidence = 1.0 //for test
-	//glog.Infof("video confidence getting : %v", fconfidence)
-
-	if fconfidence > threshold {
+	if len(dnnfilters) > 0 {
+		bcontent := false
 		srtname = "subtitle.srt"
+		srtfile, err := os.Create(srtname)
+		if err == nil {
+			//glog.Infof("Can not open subtitle.srt file %v\n", err)
+			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+		}
+		/*if err == nil { //success
+			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+			if flagclass == 0 {
+				fmt.Fprint(srtfile, "adult content!", "\n")
+			} else if flagclass == 1 {
+				fmt.Fprint(srtfile, "football match!", "\n")
+			} else {
+				fmt.Fprint(srtfile, " ", "\n")
+			}
+			srtfile.Close()
+		}*/
+
+		for i, ft := range dnnfilters {
+			clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
+			if i == 0 {
+				fconfidence = confidence //for tranncoding sample
+			}
+			glog.Infof("DnnFilter modelid classid confidence: %v %v %v", i, clsid, confidence)
+			if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
+				bcontent = true
+				fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
+			}
+		}
+
+		if bcontent == false {
+			srtname = ""
+		}
+		srtfile.Close()
 	}
 
 	params := make([]C.output_params, len(ps))
@@ -398,7 +448,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		if param.Framerate > 0 {
 			filters = fmt.Sprintf("fps=%d/1,", param.Framerate)
 		}
-		if fconfidence > 0.0 && len(srtname) > 0 {
+		if len(srtname) > 0 {
 			if input.Accel == Software {
 				filters += fmt.Sprintf("subtitles=%v,", srtname)
 			} else {
@@ -550,15 +600,6 @@ func ReleaseDnnEngine() {
 }
 
 //for multiple model
-type DnnFilter struct {
-	handle  *C.LVPDnnContext
-	initdnn bool
-	stopped bool
-	mu      *sync.Mutex
-}
-
-var dnnfilters []DnnFilter
-
 func NewDnnFilter() *DnnFilter {
 	return &DnnFilter{
 		handle:  C.lpms_dnnnew(),
@@ -570,6 +611,7 @@ func NewDnnFilter() *DnnFilter {
 func RegistryDnnEngine(dnncfg VideoProfile) {
 
 	dnnfilter := NewDnnFilter()
+	dnnfilter.dnncfg = dnncfg
 	if dnnfilter.InitDnnFilter(dnncfg) == true {
 		dnnfilters = append(dnnfilters, *dnnfilter)
 	}
@@ -602,6 +644,32 @@ func (t *DnnFilter) InitDnnFilter(dnncfg VideoProfile) bool {
 	} else {
 		return false
 	}
+}
+func (t *DnnFilter) ExecuteDnnFilter(infname string, Accel Acceleration) (int, float32) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.stopped || t.initdnn == false {
+		return -1, 0.0
+	}
+	flagHW := 0
+	if Accel == Nvidia {
+		flagHW = 1
+	}
+
+	fname := C.CString(infname)
+	defer C.free(unsafe.Pointer(fname))
+
+	var fconfidence float32 = 0.0
+	var classid int = -1
+	prob := C.float(fconfidence)
+	//flagclass := C.int(t.dnncfg.Detector.ClassID)
+	flagclass := C.int(classid)
+	tinterval := C.float(t.dnncfg.Detector.Interval)
+	C.lpms_dnnexecutewithctx(t.handle, fname, C.int(flagHW), tinterval, &flagclass, &prob)
+	fconfidence = float32(prob)
+	classid = int(flagclass)
+
+	return classid, fconfidence
 }
 func (t *DnnFilter) StopDnnFilter() {
 	t.mu.Lock()
