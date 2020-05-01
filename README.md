@@ -46,11 +46,15 @@ If the build successed, you can find the main execute file in the lpmsdemo folde
 
 For classification needs a trained model file. Please change trained filename(base on tensorflow)  to tmodel.pb  and copy it to the lpmsdemo folder, now you can start the lpms server.
 
-./main or ./main -classid=1 -interval=1.5
+./main or ./main -classid=1 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter
 
     classid : class id for classification
   
     interval: time intervals(unit second) for classification
+    
+    dnnfilter: dnn model name for classification
+    
+remark(dnnfilter): Users can use own trained models after register in [here](https://github.com/oscar-davids/lpmsdemo/blob/b9189028be8454cfc34a7186b38c6bfd642b6ba6/ffmpeg/videoprofile.go#L57.)
 
 
 The test server exposes a few different endpoints:
