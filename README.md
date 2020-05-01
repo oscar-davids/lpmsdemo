@@ -54,7 +54,7 @@ For classification needs a trained model file. Please change trained filename(ba
     
     dnnfilter: dnn model name for classification
     
-remark(dnnfilter): Users can use own trained models after register in [here](https://github.com/oscar-davids/lpmsdemo/blob/b9189028be8454cfc34a7186b38c6bfd642b6ba6/ffmpeg/videoprofile.go#L57.)
+remark(dnnfilter): Users can use own trained models after register in [here](https://github.com/oscar-davids/lpmsdemo/blob/b9189028be8454cfc34a7186b38c6bfd642b6ba6/ffmpeg/videoprofile.go#L57.).
 The Model trained using the Tensorflow should be a model for classification. In other words, the outputs of the model should be inference values array, not an image buffer.
 
 
