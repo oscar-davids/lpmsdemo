@@ -41,6 +41,8 @@ typedef struct {
   // Optional hardware acceleration
   enum AVHWDeviceType hw_type;
   char *device;
+  //for ffmpeg metadata. if not null, write ffmpeg metadata.
+  char *metadata;
 } input_params;
 
 typedef struct {
@@ -143,7 +145,7 @@ int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate
 void  	lpms_dnnfree();
 int  	lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass,float  tinteval, float* porob);
 
-//added for multibple model
+//added for multiple model
 LVPDnnContext*  lpms_dnnnew();
 int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob);

@@ -338,31 +338,54 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	var srtname string = ""
 
 	//make srt format file
+	bmetadata := false
+	var srtmetadata string = ""
 	if len(dnnfilters) > 0 {
 		bcontent := false
-		srtname = "subtitle.srt"
-		srtfile, err := os.Create(srtname)
-		if err == nil {
-			//glog.Infof("Can not open subtitle.srt file %v\n", err)
-			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+		if dnnfilters[0].dnncfg.Detector.MetaMode == 1 {
+			bmetadata = true
 		}
 
-		for i, ft := range dnnfilters {
-			clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
-			if i == 0 {
-				fconfidence = confidence //for tranncoding sample
+		if bmetadata == false {
+			srtname = "subtitle.srt"
+			srtfile, err := os.Create(srtname)
+			if err == nil {
+				//glog.Infof("Can not open subtitle.srt file %v\n", err)
+				fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
 			}
-			glog.Infof("DnnFilter modelid classid confidence: %v %v %v", i, clsid, confidence)
-			if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
-				bcontent = true
-				fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
+
+			for i, ft := range dnnfilters {
+				clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
+				if i == 0 {
+					fconfidence = confidence //for tranncoding sample
+				}
+				glog.Infof("DnnFilter modelid classid confidence: %v %v %v", i, clsid, confidence)
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
+					bcontent = true
+					fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
+				}
+			}
+
+			if bcontent == false {
+				srtname = ""
+			}
+			srtfile.Close()
+		} else {
+			for i, ft := range dnnfilters {
+				clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
+				if i == 0 {
+					fconfidence = confidence //for tranncoding sample
+				}
+				glog.Infof("DnnFilter modelid classid confidence: %v %v %v", i, clsid, confidence)
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
+					if len(srtmetadata) > 0 {
+						srtmetadata += ", "
+					}
+					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
+				}
 			}
 		}
 
-		if bcontent == false {
-			srtname = ""
-		}
-		srtfile.Close()
 	}
 
 	params := make([]C.output_params, len(ps))
@@ -469,7 +492,12 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		device = C.CString(input.Device)
 		defer C.free(unsafe.Pointer(device))
 	}
-	inp := &C.input_params{fname: fname, hw_type: hw_type, device: device,
+	var smetadata *C.char = nil
+	if bmetadata == true && len(srtmetadata) > 0 {
+		smetadata = C.CString(srtmetadata)
+		defer C.free(unsafe.Pointer(smetadata))
+	}
+	inp := &C.input_params{fname: fname, hw_type: hw_type, device: device, metadata: smetadata,
 		handle: t.handle}
 	results := make([]C.output_results, len(ps))
 	decoded := &C.output_results{}
