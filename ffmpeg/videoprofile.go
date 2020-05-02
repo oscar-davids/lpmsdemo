@@ -14,7 +14,8 @@ type DetectorProfile struct {
 	Threshold  float32
 	Input      string
 	Output     string
-	ClassID    int
+	ClassID    int // now need?
+	MetaMode   int // 0: subtitle(default), 1: ffmpeg metadata, 2: hls timed metadata(Reservation)
 	Interval   float32
 	ClassName  []string
 }
@@ -56,10 +57,10 @@ var (
 	P144p25fps16x9 = VideoProfile{Name: "P144p25fps16x9", Bitrate: "400k", Framerate: 25, AspectRatio: "16:9", Resolution: "256x144"}
 	PDnnDetector   = VideoProfile{Name: "PDnnDetector", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
 		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
-			ClassID: 0, ClassName: []string{"adult", "football match"}}}
+			ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}}
 	PDnnOtherFilter = VideoProfile{Name: "PDnnOtherFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
 		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel2.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
-			ClassID: 0, ClassName: []string{"adult", "football match"}}}
+			ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}}
 )
 
 var VideoProfileLookup = map[string]VideoProfile{

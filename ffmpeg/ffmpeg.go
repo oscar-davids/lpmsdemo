@@ -336,48 +336,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 
 	var fconfidence float32 = 0.0
 	var srtname string = ""
-	/*
-			var threshold float32 = 0.0
-			if pdnn.Profile.Detector.SampleRate > 0 {
 
-				//gdetector := NewTranscoder()
-				//defer gdetector.StopTranscoder()
-				//fconfidence, err = gdetector.Detector(input, pdnn)
-				//if err != nil {
-				//	return nil, err
-				//}
-
-				threshold = pdnn.Profile.Detector.Threshold
-
-				flagHW := 0
-				if input.Accel == Nvidia {
-					flagHW = 1
-				}
-
-				prob := C.float(fconfidence)
-				flagclass := C.int(pdnn.Profile.Detector.ClassID)
-				tinterval := C.float(pdnn.Profile.Detector.Interval)
-				C.lpms_dnnexecute(fname, C.int(flagHW), flagclass, tinterval, &prob)
-				fconfidence = float32(prob)
-
-				if len(ps) == 0 {
-					tr := make([]MediaInfo, 1)
-					dec := MediaInfo{
-						Frames: int(1),
-						Pixels: int64(1000),
-					}
-					return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
-				}
-			}
-		//make srt format file
-		srtname = ""
-		//fconfidence = 1.0 //for test
-		//glog.Infof("video confidence getting : %v", fconfidence)
-
-		if fconfidence > threshold {
-			srtname = "subtitle.srt"
-		}
-	*/
 	//make srt format file
 	if len(dnnfilters) > 0 {
 		bcontent := false
@@ -387,17 +346,6 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 			//glog.Infof("Can not open subtitle.srt file %v\n", err)
 			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
 		}
-		/*if err == nil { //success
-			fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-			if flagclass == 0 {
-				fmt.Fprint(srtfile, "adult content!", "\n")
-			} else if flagclass == 1 {
-				fmt.Fprint(srtfile, "football match!", "\n")
-			} else {
-				fmt.Fprint(srtfile, " ", "\n")
-			}
-			srtfile.Close()
-		}*/
 
 		for i, ft := range dnnfilters {
 			clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
