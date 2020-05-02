@@ -97,7 +97,7 @@ Using font provider fontconfig
 ```
 
 
-5. Now you have a RTMP video stream running, we can view it from the server.  Simply run `ffplay http://localhost:7935/stream/test2.m3u8`, you should see the hls video playback.
+5. Now you have a RTMP video stream running, we can view it from the server.  Simply run `ffplay http://localhost:7935/stream/test_classified.m3u8`, you should see the hls video playback.
 
 ### GPU Support
 
