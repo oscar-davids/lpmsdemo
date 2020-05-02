@@ -87,16 +87,18 @@ func main() {
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
 	flagClass := flag.Int("classid", 0, "class id for classification")
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
+	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector")
+		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
 			continue
 		}
-		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-dnnfilter=") < 0 {
-			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector")
+		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 &&
+			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 {
+			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0")
 		}
 	}
 	//check dnnfilter
@@ -141,8 +143,9 @@ func main() {
 			ft.Detector.ClassID = *flagClass
 		}
 		ft.Detector.Interval = float32(*interval)
+		ft.Detector.MetaMode = *metaMode
 
-		glog.Infof("Registry DnnEngine: %v", ft.Name)
+		glog.Infof("Registry DnnEngine: name: %v metadamode: %v", ft.Name, ft.Detector.MetaMode)
 		ffmpeg.RegistryDnnEngine(ft)
 	}
 
@@ -267,7 +270,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 	//Create Transcoder
 	profiles := []ffmpeg.VideoProfile{
 		ffmpeg.P720p25fps16x9,
-		ffmpeg.PDnnDetector,
+		//ffmpeg.PDnnDetector,
 		//ffmpeg.P240p30fps16x9,
 		//ffmpeg.P576p30fps16x9,
 	}

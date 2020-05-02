@@ -342,7 +342,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	var srtmetadata string = ""
 	if len(dnnfilters) > 0 {
 		bcontent := false
-		if dnnfilters[0].dnncfg.Detector.MetaMode == 1 {
+		if dnnfilters[0].dnncfg.Detector.MetaMode == MpegMetadata {
 			bmetadata = true
 		}
 
@@ -359,7 +359,6 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 				if i == 0 {
 					fconfidence = confidence //for tranncoding sample
 				}
-				glog.Infof("DnnFilter modelid classid confidence: %v %v %v", i, clsid, confidence)
 				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
 					bcontent = true
 					fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
@@ -376,8 +375,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 				if i == 0 {
 					fconfidence = confidence //for tranncoding sample
 				}
-				glog.Infof("DnnFilter modelid classid confidence: %v %v %v", i, clsid, confidence)
-				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
 					if len(srtmetadata) > 0 {
 						srtmetadata += ", "
 					}
@@ -494,6 +492,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	}
 	var smetadata *C.char = nil
 	if bmetadata == true && len(srtmetadata) > 0 {
+		//glog.Infof("DnnFilter metadata: %v", srtmetadata)
 		smetadata = C.CString(srtmetadata)
 		defer C.free(unsafe.Pointer(smetadata))
 	}

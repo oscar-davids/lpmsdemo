@@ -8,6 +8,12 @@ import (
 	"github.com/livepeer/m3u8"
 )
 
+const (
+	Subtitle = iota
+	MpegMetadata
+	HLSMetadata
+)
+
 type DetectorProfile struct {
 	SampleRate uint
 	ModelPath  string

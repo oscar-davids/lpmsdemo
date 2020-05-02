@@ -554,7 +554,7 @@ audio_output_err:
 }
 
 
-static int open_output(struct output_ctx *octx, struct input_ctx *ictx)
+static int open_output(struct output_ctx *octx, struct input_ctx *ictx, char* metadata)
 {
 #define em_err(msg) { \
   if (!ret) ret = -1; \
@@ -622,6 +622,14 @@ static int open_output(struct output_ctx *octx, struct input_ctx *ictx)
     ret = avio_open(&octx->oc->pb, octx->fname, AVIO_FLAG_WRITE);
     if (ret < 0) em_err("Error opening output file\n");
   }
+  if(metadata != NULL && strlen(metadata) > 0)
+  {
+    AVDictionary *pmetadata = NULL;
+    av_dict_set(&pmetadata, "title", metadata, 0);
+    oc->metadata = pmetadata;
+    //for debug metadata
+    av_log(0, AV_LOG_ERROR, "Engine metadata = %s\n", metadata);
+  } 
 
   ret = avformat_write_header(oc, &octx->muxer->opts);
   if (ret < 0) em_err("Error writing header\n");
@@ -1157,8 +1165,8 @@ int transcode(struct transcode_thread *h,
 
       // XXX valgrind this line up
       if (!h->initialized || AV_HWDEVICE_TYPE_NONE == octx->hw_type) {
-        ret = open_output(octx, ictx);
-        if (ret < 0) main_err("transcoder: Unable to open output");
+        ret = open_output(octx, ictx, inp->metadata);
+        if (ret < 0) main_err("transcoder: Unable to open output");        
         continue;
       }
 
@@ -1185,6 +1193,16 @@ int transcode(struct transcode_thread *h,
         ret = avio_open(&octx->oc->pb, octx->fname, AVIO_FLAG_WRITE);
         if (ret < 0) main_err("Error re-opening output file\n");
       }
+      //write metadata      
+      if(inp->metadata != NULL && strlen(inp->metadata) > 0)
+      {
+        AVDictionary *pmetadata = NULL;
+        av_dict_set(&pmetadata, "title", inp->metadata, 0);
+        octx->oc->metadata = pmetadata;
+        //for debug
+        av_log(0, AV_LOG_ERROR, "Engine metadata = %s\n",inp->metadata);
+      } 
+
       ret = avformat_write_header(octx->oc, NULL);
       if (ret < 0) main_err("Error re-writing header\n");
   }
