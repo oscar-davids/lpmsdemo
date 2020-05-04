@@ -30,13 +30,13 @@ func TestDnn_LoadModel(t *testing.T) {
 	dnncfg := str2dnnfilter(param)
 
 	if len(dnncfg.Detector.ModelPath) <= 0 || len(dnncfg.Detector.Input) <= 0 || len(dnncfg.Detector.Output) <= 0 {
-		t.Error("invalid MODEL_PARAM set %v", param)
+		t.Errorf("invalid MODEL_PARAM set %v", param)
 	}
 
 	dnnfilter := NewDnnFilter()
 	dnnfilter.dnncfg = dnncfg
 	if dnnfilter.InitDnnFilter(dnncfg) != true {
-		t.Error("Can not load model file %v", dnncfg.Detector.ModelPath)
+		t.Errorf("Can not load model file %v", dnncfg.Detector.ModelPath)
 	}
 	dnnfilter.StopDnnFilter()
 }
@@ -49,7 +49,7 @@ func BenchmarkDnn_Executetime(b *testing.B) {
 	dnnfilter := NewDnnFilter()
 	dnnfilter.dnncfg = dnncfg
 	if dnnfilter.InitDnnFilter(dnncfg) != true {
-		b.Error("Can not load model file %v", dnncfg.Detector.ModelPath)
+		b.Errorf("Can not load model file %v", dnncfg.Detector.ModelPath)
 	}
 
 	infname := "../data/bunny2.mp4"
