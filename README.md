@@ -134,7 +134,7 @@ go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,PDnnDete
 go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,PDnnDetector nv 0
 ```
 
-### Benchmark
+### Benchmark for DNN(Deep Neural Network) module
 
 To execute the test and benchmark within the `ffmpeg` directory, run this command:
 
