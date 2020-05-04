@@ -139,19 +139,19 @@ go run cmd/transcoding/transcoding.go transcoder/test.ts P144p30fps16x9,PDnnDete
 To execute the test and benchmark within the `ffmpeg` directory, run this command:
 
 ```
-go test -run=Dnn -bench DnnXX
+go test -run Dnn -bench DnnXX
 
 ```
 In here if have Nvidia GPU, can run the benchmark and test on GPU, otherwise can run on CPU
 
 ```
 # Runs on GPU
-go test -run=Dnn -bench DnnHW
+go test -run Dnn -bench DnnHW
 ```
 
 ```
 # Runs on CPU
-go test -run=Dnn -bench DnnSW
+go test -run Dnn -bench DnnSW
 ```
 
 
