@@ -74,6 +74,11 @@ type TranscodeResults struct {
 }
 
 //for multiple model
+type VideoInfo struct {
+	Vinfo *C.Vinfo
+	init  bool
+}
+
 type DnnFilter struct {
 	handle  *C.LVPDnnContext
 	initdnn bool
@@ -656,4 +661,24 @@ func (t *DnnFilter) StopDnnFilter() {
 	t.handle = nil
 	t.stopped = true
 	t.initdnn = false
+}
+
+func NewDnnVinfo() *VideoInfo {
+	return &VideoInfo{
+		Vinfo: C.lpms_vinfonew(),
+		init:  false,
+	}
+}
+func (t *VideoInfo) GetVideoInfo(infname string) string {
+	fname := C.CString(infname)
+	defer C.free(unsafe.Pointer(fname))
+	C.lpms_getvideoinfo(fname, t.Vinfo)
+
+	srtret := fmt.Sprintf("%vX%v @ %vfps %v sec", int(t.Vinfo.width), int(t.Vinfo.height), float32(t.Vinfo.fps), float32(t.Vinfo.duration))
+
+	return srtret
+}
+func (t *VideoInfo) DeleteDnnVinfo() {
+	C.free(unsafe.Pointer(t.Vinfo))
+	t.Vinfo = nil
 }

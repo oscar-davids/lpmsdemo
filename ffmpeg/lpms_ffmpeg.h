@@ -71,6 +71,13 @@ typedef enum {DNN_FLOAT = 1, DNN_UINT8 = 4} DNNDataType;
 typedef enum {DNN_NATIVE, DNN_TF} DNNBackendType;
 typedef enum {DNN_SUCCESS, DNN_ERROR} DNNReturnType;
 
+typedef struct Vinfo{
+    float fps;
+    int width, height, channels;
+    int framecount;
+    float duration;
+} Vinfo;
+
 typedef struct DNNData{
     void *data;
     DNNDataType dt;
@@ -150,6 +157,9 @@ LVPDnnContext*  lpms_dnnnew();
 int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob);
 void lpms_dnnstop(LVPDnnContext* context);
+
+Vinfo*  lpms_vinfonew();
+int     lpms_getvideoinfo(char* ivpath, Vinfo* vinfo);
 
 #endif
 #endif // _LPMS_FFMPEG_H_

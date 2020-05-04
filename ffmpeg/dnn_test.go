@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -41,6 +42,22 @@ func TestDnn_LoadModel(t *testing.T) {
 		t.Errorf("Can not load model file %v", dnncfg.Detector.ModelPath)
 	}
 	dnnfilter.StopDnnFilter()
+}
+
+func TestDnn_GetVideoInfo(t *testing.T) {
+
+	fname := "../data/bunny2.mp4"
+
+	tvinfo := NewDnnVinfo()
+	vinfo := tvinfo.GetVideoInfo(fname)
+	if len(vinfo) == 0 {
+		t.Errorf("Could not get video information %v", fname)
+	} else {
+		t.Logf("%v : %v", fname, vinfo)
+		fmt.Println(vinfo)
+	}
+
+	tvinfo.DeleteDnnVinfo()
 }
 
 //go test -run Dnn -bench Dnn

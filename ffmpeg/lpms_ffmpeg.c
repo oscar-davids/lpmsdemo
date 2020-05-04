@@ -2553,4 +2553,72 @@ void lpms_dnnstop(LVPDnnContext* context)
   lpms_dnnfreewithctx(context);  
 }
 
+Vinfo*  lpms_vinfonew()
+{
+  Vinfo *vinfo = (Vinfo*)malloc(sizeof(Vinfo));
+  memset(vinfo, 0x00, sizeof(Vinfo));
+  return vinfo;
+}
+int lpms_getvideoinfo(char* ivpath, Vinfo* vinfo)
+{
+  if(ivpath == NULL || vinfo == NULL) return DNN_ERROR;
+  AVFormatContext 	*ic = NULL;		
+	AVCodec 			    *decoder = NULL;
+  AVCodecContext 		*dx = NULL;
+  AVStream          *video = NULL;
+  int 				      ret,video_stream;
+
+  if (avformat_open_input(&ic, ivpath, NULL, NULL) != 0) {
+      fprintf(stderr, "Cannot open input file '%s'\n", ivpath);
+      return DNN_ERROR;
+  }
+
+  if (avformat_find_stream_info(ic, NULL) < 0) {
+      fprintf(stderr, "Cannot find input stream information.\n");
+      return DNN_ERROR;
+  }
+
+  /* find the video stream information */
+  ret = av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
+  if (ret < 0) {
+      fprintf(stderr, "Cannot find a video stream in the input file\n");
+      return DNN_ERROR;
+  }
+ 
+  video_stream = ret;
+  video = ic->streams[video_stream];
+
+  if (!(dx = avcodec_alloc_context3(decoder))) return AVERROR(ENOMEM);
+  if (avcodec_parameters_to_context(dx, video->codecpar) < 0) return DNN_ERROR;  
+
+	if ((ret = avcodec_open2(dx, decoder, NULL)) < 0) {
+        fprintf(stderr, "Failed to open codec for stream #%u\n", video_stream);
+        return -1;
+  }  
+
+  vinfo->fps = 1.0;
+  if(video->r_frame_rate.den > 0.0) {
+    vinfo->fps = av_q2d(video->r_frame_rate);
+  } else {
+    vinfo->fps = 1.0 / av_q2d(video->time_base);    
+  }  
+
+  vinfo->width = dx->width;
+  vinfo->height = dx->height;
+
+  vinfo->duration = (double)ic->duration / (double)AV_TIME_BASE;
+	if (vinfo->duration <= 0.000001) {
+		vinfo->duration = (double)video->duration * av_q2d(video->time_base);
+	}
+
+	vinfo->framecount = video->nb_frames;  
+	if (vinfo->framecount == 0) {
+		vinfo->framecount = (int)(vinfo->duration * vinfo->fps + 0.5);
+	}
+ 
+  avcodec_free_context(&dx);
+	avformat_close_input(&ic); 
+	return DNN_SUCCESS;
+}
+
 #endif
