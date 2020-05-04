@@ -628,7 +628,7 @@ static int open_output(struct output_ctx *octx, struct input_ctx *ictx, char* me
     av_dict_set(&pmetadata, "title", metadata, 0);
     oc->metadata = pmetadata;
     //for debug metadata
-    av_log(0, AV_LOG_ERROR, "Engine metadata = %s\n", metadata);
+    //av_log(0, AV_LOG_ERROR, "Engine metadata = %s\n", metadata);
   } 
 
   ret = avformat_write_header(oc, &octx->muxer->opts);
@@ -1200,7 +1200,7 @@ int transcode(struct transcode_thread *h,
         av_dict_set(&pmetadata, "title", inp->metadata, 0);
         octx->oc->metadata = pmetadata;
         //for debug
-        av_log(0, AV_LOG_ERROR, "Engine metadata = %s\n",inp->metadata);
+        //av_log(0, AV_LOG_ERROR, "Engine metadata = %s\n",inp->metadata);
       } 
 
       ret = avformat_write_header(octx->oc, NULL);

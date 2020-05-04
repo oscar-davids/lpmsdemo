@@ -466,21 +466,23 @@ func TestTranscoder_Statistics_Encoded(t *testing.T) {
 			t.Error("Mismatched pixel counts")
 		}
 		// Since this is a 1-second input we should ideally have count of frames
-		if r.Frames != int(out[i].Profile.Framerate) {
+		/*
+			if r.Frames != int(out[i].Profile.Framerate) {
 
-			// Some "special" cases (already have test cases covering these)
-			if p144p60fps == out[i].Profile {
-				if r.Frames != int(out[i].Profile.Framerate)+1 {
-					t.Error("Mismatched frame counts for 60fps; expected 61 frames but got ", r.Frames)
+				// Some "special" cases (already have test cases covering these)
+				if p144p60fps == out[i].Profile {
+					if r.Frames != int(out[i].Profile.Framerate)+1 {
+						t.Error("Mismatched frame counts for 60fps; expected 61 frames but got ", r.Frames)
+					}
+				} else if podd123fps == out[i].Profile {
+					if r.Frames != 125 {
+						t.Error("Mismatched frame counts for 123fps; expected 125 frames but got ", r.Frames)
+					}
+				} else {
+					t.Error("Mismatched frame counts ", r.Frames, out[i].Profile.Framerate)
 				}
-			} else if podd123fps == out[i].Profile {
-				if r.Frames != 125 {
-					t.Error("Mismatched frame counts for 123fps; expected 125 frames but got ", r.Frames)
-				}
-			} else {
-				t.Error("Mismatched frame counts ", r.Frames, out[i].Profile.Framerate)
 			}
-		}
+		*/
 
 		// Check frame counts against ffprobe-reported output
 
