@@ -193,12 +193,12 @@ func BenchmarkDnnSW_AllDigitalExecutetime(b *testing.B) {
 			// hw dec, hw enc
 			err = Transcode2(&TranscodeOptionsIn{
 				Fname: fname,
-				Accel: Nvidia,
+				Accel: Software,
 			}, []TranscodeOptions{
 				{
 					Oname:   oname,
 					Profile: prof,
-					Accel:   Nvidia,
+					Accel:   Software,
 				},
 			})
 			if err != nil {
