@@ -2380,9 +2380,10 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob)
 {
 	char sdevicetype[64] = {0,};
-	int	 ret, i;
+	int	 ret, i , classnum;
 	AVStream *video = NULL;
 	AVPacket packet;
+  float *confidences = NULL;
 	
 	if(context == NULL || ivpath == NULL) return DNN_ERROR;	
 
@@ -2462,13 +2463,18 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
   }  
   int nsamplerate = (int)(frmarate * tinteval);
   if(nsamplerate == 0) nsamplerate = context->sample_rate;
+
+  classnum = context->output.height;
+  //if really nsamplerate is zero then only transcoding
+  if(nsamplerate == 0 || classnum == 0)
+    goto cleancontext;
+
 	context->readframe = av_frame_alloc();
 
-  int   classnum = context->output.height;
-  float *confidences = malloc(sizeof(float)*classnum);
+  confidences = malloc(sizeof(float)*classnum);
   memset(confidences,0x00,sizeof(float)*classnum);
-
-	while (ret >= 0) {
+  
+  while (ret >= 0) {
 
 		if ((ret = av_read_frame(context->input_ctx, &packet)) < 0)
 	    	break;
@@ -2521,6 +2527,7 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
 
   av_log(0, AV_LOG_ERROR, "Engine Classid & Probability = %d %f\n",*classid, *porob);
   
+ cleancontext: 
   if(confidences)
     free(confidences);
   //release frame and scale context
