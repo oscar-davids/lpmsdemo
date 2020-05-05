@@ -610,34 +610,6 @@ func ReleaseDnnEngine() {
 		C.lpms_dnnfree()
 	}
 }
-
-//for multiple model
-//variable for vertical extention
-//var dnnMatrix [][]DnnSet
-//var dnnsets []DnnSet //now used
-//var gpunum int = 0
-//var gpuparallel int = 1
-
-func SetAvailableGpuNum(ngpu int) int {
-	gpunum = ngpu
-	//set tensorflow device setting
-	return gpunum
-}
-func GetAvailableGpuNum() int {
-	return gpunum
-}
-
-func SetParallelGpuNum(parallel int) int {
-	gpuparallel = parallel
-	if gpuparallel > 0 {
-		dnnsets = make([]DnnSet, gpuparallel)
-	}
-	return gpuparallel
-}
-func GetParallelGpuNum() int {
-	return gpuparallel
-}
-
 func NewDnnFilter() *DnnFilter {
 	return &DnnFilter{
 		handle:  C.lpms_dnnnew(),
@@ -709,6 +681,34 @@ func (t *DnnFilter) StopDnnFilter() {
 }
 
 //gloabal API
+
+//for multiple model
+//variable for vertical extention
+//var dnnMatrix [][]DnnSet
+//var dnnsets []DnnSet //now used
+//var gpunum int = 0
+//var gpuparallel int = 1
+
+func SetAvailableGpuNum(ngpu int) int {
+	gpunum = ngpu
+	//set tensorflow device setting
+	return gpunum
+}
+func GetAvailableGpuNum() int {
+	return gpunum
+}
+
+func SetParallelGpuNum(parallel int) int {
+	gpuparallel = parallel
+	if gpuparallel > 0 {
+		dnnsets = make([]DnnSet, gpuparallel)
+	}
+	return gpuparallel
+}
+func GetParallelGpuNum() int {
+	return gpuparallel
+}
+
 func RegistryDnnEngine(dnncfg VideoProfile) {
 
 	dnnfilter := NewDnnFilter()
