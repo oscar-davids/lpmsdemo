@@ -93,7 +93,7 @@ typedef struct DNNModel{
     // Sets model input and output.
     // Should be called at least once before model execution.
     DNNReturnType (*set_input_output)(void *model, DNNData *input, const char *input_name, 
-                    const char **output_names, uint32_t nb_output);
+                    const char **output_names, uint32_t nb_output, uint32_t gpuid);
 } DNNModel;
 
 typedef struct DNNModule{
@@ -114,6 +114,7 @@ typedef struct LVPDnnContext {
     char    *model_inputname;
     char    *model_outputname;
     int     sample_rate;
+    int     gpuid;
     float   valid_threshold;
     char    log_filename[MAXPATH];
 
@@ -154,7 +155,7 @@ int  	lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass,float  tinteval,
 
 //added for multiple model
 LVPDnnContext*  lpms_dnnnew();
-int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
+int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold, int gpuid);
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob);
 void lpms_dnnstop(LVPDnnContext* context);
 

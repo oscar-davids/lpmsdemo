@@ -1487,7 +1487,7 @@ static DNNReturnType get_input_tf(void *model, DNNData *input, const char *input
     return DNN_SUCCESS;
 }
 
-static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char *input_name, const char **output_names, uint32_t nb_output)
+static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char *input_name, const char **output_names, uint32_t nb_output,uint32_t gpuid)
 {
     TFModel *tf_model = (TFModel *)model;
     TF_SessionOptions *sess_opts;
@@ -1549,9 +1549,9 @@ static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char
 
     sess_opts = TF_NewSessionOptions();
     // protobuf data for auto memory gpu_options.allow_growth=True and gpu_options.visible_device_list="0" 
-	uint8_t config[7] = { 0x32, 0x5, 0x20, 0x1, 0x2a, 0x01, 0x30 }; 
-	TF_SetConfig(sess_opts, (void*)config, 7, tf_model->status);
-
+	  //uint8_t config[10] = { 0x32, 0x5, 0x20, 0x1, 0x2a, 0x01, 0x30, 0x00, 0x00, }; 
+    //config[6] += gpuid;  
+	  //TF_SetConfig(sess_opts, (void*)config, 7, tf_model->status);
 
     tf_model->session = TF_NewSession(tf_model->graph, sess_opts, tf_model->status);
     TF_DeleteSessionOptions(sess_opts);
@@ -2184,7 +2184,7 @@ int  lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, f
 
   result = (ctx->model->set_input_output)(ctx->model->model,
                                       &ctx->input, ctx->model_inputname,
-                                      (const char **)&ctx->model_outputname, 1);
+                                      (const char **)&ctx->model_outputname, 1 , 0);
   
 
   if (result != DNN_SUCCESS) {
@@ -2245,7 +2245,7 @@ void  lpms_dnnfree()
 }
 
 //for multiple model 
-int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold)
+int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold, int gpuid)
 {   
   DNNReturnType result;
   DNNData model_input;
@@ -2261,6 +2261,8 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
   ctx->sample_rate = samplerate;
   ctx->valid_threshold = fthreshold;
 
+  if(gpuid >= 0) ctx->gpuid = gpuid;
+  else ctx->gpuid = 0;
 
   if (strlen(ctx->model_filename)<=0) {
       av_log(NULL, AV_LOG_ERROR, "model file for network is not specified\n");
@@ -2320,7 +2322,7 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
 
   result = (ctx->model->set_input_output)(ctx->model->model,
                                       &ctx->input, ctx->model_inputname,
-                                      (const char **)&ctx->model_outputname, 1);
+                                      (const char **)&ctx->model_outputname, 1,ctx->gpuid);
   
 
   if (result != DNN_SUCCESS) {
@@ -2473,7 +2475,7 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
 
   confidences = malloc(sizeof(float)*classnum);
   memset(confidences,0x00,sizeof(float)*classnum);
-  
+
   while (ret >= 0) {
 
 		if ((ret = av_read_frame(context->input_ctx, &packet)) < 0)

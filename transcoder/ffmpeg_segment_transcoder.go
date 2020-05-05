@@ -17,10 +17,11 @@ type FFMpegSegmentTranscoder struct {
 	workDir    string
 	streamID   string
 	parallelid int
+	gpuid      int
 }
 
 func NewFFMpegSegmentTranscoder(ps []ffmpeg.VideoProfile, workd string) *FFMpegSegmentTranscoder {
-	return &FFMpegSegmentTranscoder{tProfiles: ps, workDir: workd, parallelid: -1}
+	return &FFMpegSegmentTranscoder{tProfiles: ps, workDir: workd, parallelid: -1, gpuid: -1}
 }
 func (t *FFMpegSegmentTranscoder) SetStreamID(sid string) {
 	t.streamID = sid
@@ -28,9 +29,12 @@ func (t *FFMpegSegmentTranscoder) SetStreamID(sid string) {
 func (t *FFMpegSegmentTranscoder) SetParallelID(pid int) {
 	t.parallelid = pid
 }
+func (t *FFMpegSegmentTranscoder) SetGpuID(gid int) {
+	t.gpuid = gid
+}
 func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, error) {
 	//Invoke ffmpeg
-	err := ffmpeg.Transcode(fname, t.workDir, t.parallelid, t.tProfiles)
+	err := ffmpeg.Transcode(fname, t.workDir, t.parallelid, t.gpuid, t.tProfiles)
 	if err != nil {
 		glog.Errorf("Error transcoding: %v", err)
 		return nil, err

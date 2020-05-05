@@ -81,7 +81,7 @@ func validDnnfilters() []string {
 	return valids
 }
 
-//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter -metamode=0 -gpucount=2
+//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter -metamode=0 -gpucount=2 -parallel=2
 func main() {
 
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
@@ -92,7 +92,7 @@ func main() {
 	parallel := flag.Int("parallel", 2, "parallel processing count for clasiifier")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -parallel=2 -gpucount=2")
+		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
@@ -100,7 +100,7 @@ func main() {
 		}
 		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-parallel=") < 0 &&
 			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 && strings.Index(s, "-gpucount=") < 0 {
-			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -parallel=2 -gpucount=2")
+			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
 		}
 	}
 	//check dnnfilter
@@ -208,6 +208,7 @@ func main() {
 			rtmpStrm = nil
 			hlsStrm = nil
 			ffmpeg.RemoveParallelID(streamID)
+			ffmpeg.RemoveGpuInx(streamID)
 			return nil
 		})
 
@@ -294,6 +295,11 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 
 	t.SetParallelID(pid)
 	glog.Infof("Set PID, strmID: %v %v\n", pid, strmID)
+
+	gpuid := ffmpeg.GetGpuIdx(strmID)
+	if gpuid >= 0 {
+		t.SetGpuID(gpuid)
+	}
 
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
 		//If we get a new video segment for the original HLS stream, do the transcoding.

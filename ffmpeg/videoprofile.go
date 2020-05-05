@@ -20,6 +20,7 @@ type DetectorProfile struct {
 	Threshold  float32
 	Input      string
 	Output     string
+	Gpuid      int
 	ClassID    int // now need?
 	MetaMode   int // 0: subtitle(default), 1: ffmpeg metadata, 2: hls timed metadata(Reservation)
 	Interval   float32

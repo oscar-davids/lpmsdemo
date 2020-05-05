@@ -94,11 +94,17 @@ type DnnSet struct {
 	filters  []DnnFilter
 }
 
+type GpuStatus struct {
+	usage     int
+	streamIds []string
+}
+
 var initengine bool = false
 var dnnfilters []DnnFilter
 var dnnsets []DnnSet //now used
 var gpuparallel int = 0
 var gpunum int = 0
+var gpuusage []GpuStatus
 
 //in the future
 //var dnnMatrix [][]DnnSet
@@ -123,8 +129,8 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 }
 
 //call subscriber
-func Transcode(input string, workDir string, pid int, ps []VideoProfile) error {
-
+func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile) error {
+	sdev := fmt.Sprintf("%d", gid)
 	opts := make([]TranscodeOptions, len(ps))
 	for i, param := range ps {
 		oname := path.Join(workDir, fmt.Sprintf("out%v%v", i, filepath.Base(input)))
@@ -133,12 +139,14 @@ func Transcode(input string, workDir string, pid int, ps []VideoProfile) error {
 			Oname:   oname,
 			Profile: param,
 			Accel:   Nvidia,
+			Device:  sdev,
 		}
 		opts[i] = opt
 	}
 	inopts := &TranscodeOptionsIn{
 		Fname:      input,
 		Accel:      Nvidia,
+		Device:     sdev,
 		ParallelID: pid,
 	}
 	return Transcode2(inopts, opts)
@@ -654,7 +662,9 @@ func (t *DnnFilter) InitDnnFilter(dnncfg VideoProfile) bool {
 	nsample := int(dnncfg.Detector.SampleRate)
 	threshold := dnncfg.Detector.Threshold
 
-	res := C.lpms_dnninitwithctx(t.handle, model, Input, Output, C.int(nsample), C.float(threshold))
+	gpuid := int(dnncfg.Detector.Gpuid)
+
+	res := C.lpms_dnninitwithctx(t.handle, model, Input, Output, C.int(nsample), C.float(threshold), C.int(gpuid))
 	if res == 0 {
 		t.initdnn = true
 		t.stopped = false
@@ -770,11 +780,65 @@ func (t *DnnSet) ReleaseSetDnnFilter() {
 
 func SetAvailableGpuNum(ngpu int) int {
 	gpunum = ngpu
+	if gpunum > 0 {
+		gpuusage = make([]GpuStatus, gpunum)
+
+		for i, _ := range gpuusage {
+			gpuusage[i].usage = 0
+		}
+	}
 	//set tensorflow device setting
 	return gpunum
 }
 func GetAvailableGpuNum() int {
 	return gpunum
+}
+func GetGpuIdx(sid string) int {
+	gpuid := -1
+	usemin := 1000
+	for i, _ := range gpuusage {
+		if gpuusage[i].usage == 0 {
+			gpuid = i
+			break
+		}
+		if usemin > gpuusage[i].usage {
+			usemin = gpuusage[i].usage
+			gpuid = i
+		}
+	}
+
+	if gpuid != -1 {
+		gpuusage[gpuid].usage++
+		gpuusage[gpuid].streamIds = append(gpuusage[gpuid].streamIds, sid)
+	}
+
+	return gpuid
+}
+func RemoveGpuInx(sid string) {
+	flagbreak := false
+	for i, _ := range gpuusage {
+		for j, _ := range gpuusage[i].streamIds {
+			if gpuusage[i].streamIds[j] == sid {
+				gpuusage[i].streamIds[j] = gpuusage[i].streamIds[len(gpuusage[i].streamIds)-1]
+				gpuusage[i].streamIds = gpuusage[i].streamIds[:len(gpuusage[i].streamIds)-1]
+				gpuusage[i].usage--
+				flagbreak = true
+				break
+			}
+		}
+		if flagbreak == true {
+			break
+		}
+	}
+}
+func RemoveGpuInxWithID(gid int) {
+	if gid >= 0 && gid < len(gpuusage) {
+		gpuusage[gid].usage--
+		if gpuusage[gid].usage < 0 {
+			gpuusage[gid].usage = 0
+		}
+	}
+
 }
 
 func SetParallelGpuNum(parallel int) int {
@@ -827,6 +891,12 @@ func RegistryDnnEngine(dnncfg VideoProfile) {
 	if gpuparallel > 0 {
 		for i, _ := range dnnsets {
 			dnnfilter := NewDnnFilter()
+			gid := 0
+			if gpunum > 0 {
+				gid = i % gpunum
+			}
+			dnncfg.Detector.Gpuid = gid
+
 			dnnfilter.dnncfg = dnncfg
 			if dnnfilter.InitDnnFilter(dnncfg) == true {
 				dnnsets[i].filters = append(dnnsets[i].filters, *dnnfilter)
