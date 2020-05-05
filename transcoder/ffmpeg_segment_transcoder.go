@@ -13,17 +13,24 @@ import (
 
 //SegmentTranscoder transcodes segments individually.  This is a simple wrapper for calling FFMpeg on the command line.
 type FFMpegSegmentTranscoder struct {
-	tProfiles []ffmpeg.VideoProfile
-	workDir   string
+	tProfiles  []ffmpeg.VideoProfile
+	workDir    string
+	streamID   string
+	parallelid int
 }
 
 func NewFFMpegSegmentTranscoder(ps []ffmpeg.VideoProfile, workd string) *FFMpegSegmentTranscoder {
-	return &FFMpegSegmentTranscoder{tProfiles: ps, workDir: workd}
+	return &FFMpegSegmentTranscoder{tProfiles: ps, workDir: workd, parallelid: -1}
 }
-
+func (t *FFMpegSegmentTranscoder) SetStreamID(sid string) {
+	t.streamID = sid
+}
+func (t *FFMpegSegmentTranscoder) SetParallelID(pid int) {
+	t.parallelid = pid
+}
 func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, error) {
 	//Invoke ffmpeg
-	err := ffmpeg.Transcode(fname, t.workDir, t.tProfiles)
+	err := ffmpeg.Transcode(fname, t.workDir, t.parallelid, t.tProfiles)
 	if err != nil {
 		glog.Errorf("Error transcoding: %v", err)
 		return nil, err

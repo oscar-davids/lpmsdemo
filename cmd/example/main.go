@@ -89,17 +89,18 @@ func main() {
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
 	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
+	parallel := flag.Int("parallel", 2, "parallel processing count for clasiifier")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2")
+		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -parallel=2 -gpucount=2")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
 			continue
 		}
-		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 &&
+		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-parallel=") < 0 &&
 			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 && strings.Index(s, "-gpucount=") < 0 {
-			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2")
+			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -parallel=2 -gpucount=2")
 		}
 	}
 	//check dnnfilter
@@ -139,8 +140,8 @@ func main() {
 	//loading dnnmodule only once
 	//ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
 	//Register Dnn filter into Transcode Engine
-	gpunum := *gpucount
-	ffmpeg.SetAvailableGpuNum(gpunum)
+	ffmpeg.SetAvailableGpuNum(*gpucount)
+	ffmpeg.SetParallelGpuNum(*parallel)
 
 	for i, ft := range dnnfilters {
 		if i == 0 {
@@ -202,9 +203,11 @@ func main() {
 		func(url *url.URL, rtmpStrm stream.RTMPVideoStream) error {
 			glog.Infof("Ending stream for %v", hlsStrm.GetStreamID())
 			//Remove the stream
+			streamID := hlsStrm.GetStreamID()
 			cancelSeg()
 			rtmpStrm = nil
 			hlsStrm = nil
+			ffmpeg.RemoveParallelID(streamID)
 			return nil
 		})
 
@@ -279,58 +282,43 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		//ffmpeg.P576p30fps16x9,
 	}
 	workDir := ".tmp/"
+	strmID := hlsStream.GetStreamID()
 	t := transcoder.NewFFMpegSegmentTranscoder(profiles, workDir)
+	//t.SetStreamID(strmID)
+	pid := ffmpeg.AddParallelID(strmID)
 
-	for i, p := range profiles {
-		if p.Name == "PDnnDetector" {
-			profiles[i].Detector.ClassID = flagclass
-			profiles[i].Detector.Interval = float32(tinterval)
-			continue
-		}
+	if pid == -1 {
+		glog.Errorf("Can not find transcoding pid with streamid: %v", strmID)
+		return nil, ffmpeg.ErrTranscoderStp
 	}
 
-	//create sutilte template
-	srtname := "subtitle.srt"
-	srtfile, err := os.Create(srtname)
-	if err == nil { //success
-		fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-		if flagclass == 0 {
-			fmt.Fprint(srtfile, "adult content!", "\n")
-		} else if flagclass == 1 {
-			fmt.Fprint(srtfile, "football match!", "\n")
-		} else {
-			fmt.Fprint(srtfile, " ", "\n")
-		}
-		srtfile.Close()
-	}
+	t.SetParallelID(pid)
+	glog.Infof("Set PID, strmID: %v %v\n", pid, strmID)
 
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
 		//If we get a new video segment for the original HLS stream, do the transcoding.
-		glog.Infof("Got seg: %v %v\n", seg.Name, hlsStream.GetStreamID())
-		strmID := hlsStream.GetStreamID()
-		{
-			getfile := ".tmp/" + seg.Name
-			//Transcode stream
-			tData, err := t.Transcode(getfile)
-			if err != nil {
-				glog.Errorf("Error transcoding: %v", err)
-			} else {
+		//glog.Infof("Got seg: %v %v\n", seg.Name, hlsStream.GetStreamID())
+		//getfile := ".tmp/" + seg.Name
+		getfile := workDir + seg.Name
+		//Transcode stream
+		tData, err := t.Transcode(getfile)
+		if err != nil {
+			glog.Errorf("Error transcoding: %v", err)
+		} else {
 
-				//Insert into HLS stream
-				//for i, strmID := range strmIDs
-				for i, p := range profiles {
-					if p.Name == "PDnnDetector" {
-						continue
-					}
-					glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
-					sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
+			//Insert into HLS stream
+			//for i, strmID := range strmIDs
+			for i, p := range profiles {
+				if p.Name == "PDnnDetector" {
+					continue
+				}
+				//glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
+				sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
 
-					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 2}); err != nil {
-						glog.Errorf("Error writing transcoded seg: %v", err)
-					}
+				if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 2}); err != nil {
+					glog.Errorf("Error writing transcoded seg: %v", err)
 				}
 			}
-
 		}
 	}
 

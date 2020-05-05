@@ -46,9 +46,10 @@ type Transcoder struct {
 }
 
 type TranscodeOptionsIn struct {
-	Fname  string
-	Accel  Acceleration
-	Device string
+	Fname      string
+	Accel      Acceleration
+	Device     string
+	ParallelID int
 }
 
 type TranscodeOptions struct {
@@ -88,19 +89,19 @@ type DnnFilter struct {
 }
 
 type DnnSet struct {
-	streamId   string
-	gpuid      uint
-	dnnfilters []DnnFilter
+	streamId string
+	gpuid    uint
+	filters  []DnnFilter
 }
 
 var initengine bool = false
 var dnnfilters []DnnFilter
 var dnnsets []DnnSet //now used
-var gpuparallel int = 1
+var gpuparallel int = 0
+var gpunum int = 0
 
 //in the future
-var dnnMatrix [][]DnnSet
-var gpunum int = 0
+//var dnnMatrix [][]DnnSet
 
 func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs string, seg_start int) error {
 	inp := C.CString(localRTMPUrl)
@@ -122,7 +123,7 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 }
 
 //call subscriber
-func Transcode(input string, workDir string, ps []VideoProfile) error {
+func Transcode(input string, workDir string, pid int, ps []VideoProfile) error {
 
 	opts := make([]TranscodeOptions, len(ps))
 	for i, param := range ps {
@@ -136,8 +137,9 @@ func Transcode(input string, workDir string, ps []VideoProfile) error {
 		opts[i] = opt
 	}
 	inopts := &TranscodeOptionsIn{
-		Fname: input,
-		Accel: Nvidia,
+		Fname:      input,
+		Accel:      Nvidia,
+		ParallelID: pid,
 	}
 	return Transcode2(inopts, opts)
 }
@@ -320,6 +322,61 @@ func (t *Transcoder) Detector(input *TranscodeOptionsIn, p TranscodeOptions) (fl
 	return fconfidence, nil
 }
 
+func (t *Transcoder) ExecuteSetFilter(infname string, Accel Acceleration) (subtfname string, srtmetadata string, fconfidence float32) {
+
+	subtfname = ""
+	srtmetadata = ""
+	fconfidence = 0.0
+
+	if len(dnnfilters) > 0 {
+		bmetadata := false
+		bcontent := false
+		if dnnfilters[0].dnncfg.Detector.MetaMode == MpegMetadata {
+			bmetadata = true
+		}
+
+		if bmetadata == false {
+			subtfname = "subtitle.srt"
+			srtfile, err := os.Create(subtfname)
+			if err == nil {
+				//glog.Infof("Can not open subtitle.srt file %v\n", err)
+				fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+			}
+
+			for i, ft := range dnnfilters {
+				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
+				if i == 0 {
+					fconfidence = confidence //for tranncoding sample
+				}
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
+					bcontent = true
+					fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
+				}
+			}
+
+			if bcontent == false {
+				subtfname = ""
+			}
+			srtfile.Close()
+		} else {
+			for i, ft := range dnnfilters {
+				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
+				if i == 0 {
+					fconfidence = confidence //for tranncoding sample
+				}
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
+					if len(srtmetadata) > 0 {
+						srtmetadata += ", "
+					}
+					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
+				}
+			}
+		}
+
+	}
+
+	return subtfname, srtmetadata, fconfidence
+}
 func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOptions) (*TranscodeResults, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -352,56 +409,20 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		}
 	}
 
-	var fconfidence float32 = 0.0
-	var srtname string = ""
-
 	//make srt format file
-	bmetadata := false
+	var subtfname string = ""
 	var srtmetadata string = ""
-	if len(dnnfilters) > 0 {
-		bcontent := false
-		if dnnfilters[0].dnncfg.Detector.MetaMode == MpegMetadata {
-			bmetadata = true
+	var fconfidence float32 = 0.0
+
+	if gpuparallel > 0 {
+		glog.Infof("Parallel ID / Parallel Count: %v/%v\n", input.ParallelID, gpuparallel)
+
+		if input.ParallelID >= 0 && input.ParallelID < gpuparallel {
+			subtfname, srtmetadata = dnnsets[input.ParallelID].ExecuteSetDnnFilter(input.Fname, input.Accel)
 		}
 
-		if bmetadata == false {
-			srtname = "subtitle.srt"
-			srtfile, err := os.Create(srtname)
-			if err == nil {
-				//glog.Infof("Can not open subtitle.srt file %v\n", err)
-				fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
-			}
-
-			for i, ft := range dnnfilters {
-				clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
-				if i == 0 {
-					fconfidence = confidence //for tranncoding sample
-				}
-				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
-					bcontent = true
-					fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
-				}
-			}
-
-			if bcontent == false {
-				srtname = ""
-			}
-			srtfile.Close()
-		} else {
-			for i, ft := range dnnfilters {
-				clsid, confidence := ft.ExecuteDnnFilter(input.Fname, input.Accel)
-				if i == 0 {
-					fconfidence = confidence //for tranncoding sample
-				}
-				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
-					if len(srtmetadata) > 0 {
-						srtmetadata += ", "
-					}
-					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
-				}
-			}
-		}
-
+	} else {
+		subtfname, srtmetadata, fconfidence = t.ExecuteSetFilter(input.Fname, input.Accel)
 	}
 
 	params := make([]C.output_params, len(ps))
@@ -435,11 +456,11 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		if param.Framerate > 0 {
 			filters = fmt.Sprintf("fps=%d/1,", param.Framerate)
 		}
-		if len(srtname) > 0 {
+		if len(subtfname) > 0 {
 			if input.Accel == Software {
-				filters += fmt.Sprintf("subtitles=%v,", srtname)
+				filters += fmt.Sprintf("subtitles=%v,", subtfname)
 			} else {
-				filters += fmt.Sprintf("hwdownload,format=nv12,subtitles=%v,", srtname)
+				filters += fmt.Sprintf("hwdownload,format=nv12,subtitles=%v,", subtfname)
 			}
 
 			if p.Accel == Nvidia {
@@ -509,7 +530,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		defer C.free(unsafe.Pointer(device))
 	}
 	var smetadata *C.char = nil
-	if bmetadata == true && len(srtmetadata) > 0 {
+	if len(srtmetadata) > 0 {
 		//glog.Infof("DnnFilter metadata: %v", srtmetadata)
 		smetadata = C.CString(srtmetadata)
 		defer C.free(unsafe.Pointer(smetadata))
@@ -680,6 +701,64 @@ func (t *DnnFilter) StopDnnFilter() {
 	t.initdnn = false
 }
 
+func (t *DnnSet) ExecuteSetDnnFilter(infname string, Accel Acceleration) (subtfname string, srtmetadata string) {
+
+	bmetadata := false
+	subtfname = ""
+	srtmetadata = ""
+
+	if len(t.filters) > 0 {
+		bcontent := false
+		if t.filters[0].dnncfg.Detector.MetaMode == MpegMetadata {
+			bmetadata = true
+		}
+
+		if bmetadata == false {
+			subtfname = t.streamId + ".srt"
+			srtfile, err := os.Create(subtfname)
+			if err == nil {
+				//glog.Infof("Can not open subtitle.srt file %v\n", err)
+				fmt.Fprint(srtfile, 1, "\n", "00:00:00.0 --> 00:10:00.0", "\n")
+			}
+
+			for _, ft := range t.filters {
+				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) && err == nil {
+					bcontent = true
+					fmt.Fprint(srtfile, "content: ", ft.dnncfg.Detector.ClassName[clsid], "!\n")
+				}
+			}
+
+			if bcontent == false {
+				subtfname = ""
+			}
+			srtfile.Close()
+		} else {
+			for _, ft := range t.filters {
+				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
+					if len(srtmetadata) > 0 {
+						srtmetadata += ", "
+					}
+					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
+				}
+			}
+		}
+	}
+
+	return subtfname, srtmetadata
+}
+func (t *DnnSet) StopSetDnnFilter() {
+	t.streamId = ""
+}
+func (t *DnnSet) ReleaseSetDnnFilter() {
+
+	for _, filter := range t.filters {
+		filter.StopDnnFilter()
+	}
+	t.streamId = ""
+}
+
 //gloabal API
 
 //for multiple model
@@ -709,16 +788,71 @@ func GetParallelGpuNum() int {
 	return gpuparallel
 }
 
-func RegistryDnnEngine(dnncfg VideoProfile) {
+func AddParallelID(streamId string) int {
+	pid := -1
+	if gpuparallel > 0 {
+		for i, _ := range dnnsets {
+			if dnnsets[i].streamId == streamId {
+				pid = i
+				break
+			}
+		}
+		if pid == -1 {
+			for i, _ := range dnnsets {
+				if dnnsets[i].streamId == "" {
+					dnnsets[i].streamId = streamId
+					pid = i
+					break
+				}
+			}
+		}
+	} else {
+		pid = 0
+	}
 
-	dnnfilter := NewDnnFilter()
-	dnnfilter.dnncfg = dnncfg
-	if dnnfilter.InitDnnFilter(dnncfg) == true {
-		dnnfilters = append(dnnfilters, *dnnfilter)
+	return pid
+}
+func RemoveParallelID(streamId string) {
+	if gpuparallel > 0 {
+		for i, _ := range dnnsets {
+			if dnnsets[i].streamId == streamId {
+				dnnsets[i].streamId = ""
+				break
+			}
+		}
+	}
+}
+
+func RegistryDnnEngine(dnncfg VideoProfile) {
+	if gpuparallel > 0 {
+		for i, _ := range dnnsets {
+			dnnfilter := NewDnnFilter()
+			dnnfilter.dnncfg = dnncfg
+			if dnnfilter.InitDnnFilter(dnncfg) == true {
+				dnnsets[i].filters = append(dnnsets[i].filters, *dnnfilter)
+				//glog.Infof("RegistryDnnEngine debug-1: %v", len(dnnsets[i].filters))
+			}
+		}
+		//glog.Infof("RegistryDnnEngine debug-2 %v", len(dnnsets[0].filters))
+
+	} else {
+		dnnfilter := NewDnnFilter()
+		dnnfilter.dnncfg = dnncfg
+		if dnnfilter.InitDnnFilter(dnncfg) == true {
+			dnnfilters = append(dnnfilters, *dnnfilter)
+		}
 	}
 }
 func RemoveAllDnnEngine() {
-	for _, filter := range dnnfilters {
-		filter.StopDnnFilter()
+	if gpuparallel > 0 {
+		for i, _ := range dnnsets {
+			dnnsets[i].ReleaseSetDnnFilter()
+		}
+
+	} else {
+		for _, filter := range dnnfilters {
+			filter.StopDnnFilter()
+		}
 	}
+
 }
