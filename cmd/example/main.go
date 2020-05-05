@@ -81,24 +81,25 @@ func validDnnfilters() []string {
 	return valids
 }
 
-//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter
+//main -classid=0 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter -metamode=0 -gpucount=2
 func main() {
 
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
 	flagClass := flag.Int("classid", 0, "class id for classification")
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
 	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
+	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0")
+		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
 			continue
 		}
 		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 &&
-			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 {
-			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0")
+			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 && strings.Index(s, "-gpucount=") < 0 {
+			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2")
 		}
 	}
 	//check dnnfilter
@@ -138,6 +139,9 @@ func main() {
 	//loading dnnmodule only once
 	//ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
 	//Register Dnn filter into Transcode Engine
+	gpunum := *gpucount
+	ffmpeg.SetAvailableGpuNum(gpunum)
+
 	for i, ft := range dnnfilters {
 		if i == 0 {
 			ft.Detector.ClassID = *flagClass

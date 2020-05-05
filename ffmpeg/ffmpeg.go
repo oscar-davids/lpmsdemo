@@ -87,7 +87,20 @@ type DnnFilter struct {
 	dnncfg  VideoProfile
 }
 
+type DnnSet struct {
+	streamId   string
+	gpuid      uint
+	dnnfilters []DnnFilter
+}
+
+var initengine bool = false
 var dnnfilters []DnnFilter
+var dnnsets []DnnSet //now used
+var gpuparallel int = 1
+
+//in the future
+var dnnMatrix [][]DnnSet
+var gpunum int = 0
 
 func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs string, seg_start int) error {
 	inp := C.CString(localRTMPUrl)
@@ -555,7 +568,26 @@ func InitFFmpeg() {
 	C.lpms_init()
 }
 
-var initengine bool = false
+// get video info implementation
+func NewDnnVinfo() *VideoInfo {
+	return &VideoInfo{
+		Vinfo: C.lpms_vinfonew(),
+		init:  false,
+	}
+}
+func (t *VideoInfo) GetVideoInfo(infname string) string {
+	fname := C.CString(infname)
+	defer C.free(unsafe.Pointer(fname))
+	C.lpms_getvideoinfo(fname, t.Vinfo)
+
+	srtret := fmt.Sprintf("%vX%v @ %vfps %v sec", int(t.Vinfo.width), int(t.Vinfo.height), float32(t.Vinfo.fps), float32(t.Vinfo.duration))
+
+	return srtret
+}
+func (t *VideoInfo) DeleteDnnVinfo() {
+	C.free(unsafe.Pointer(t.Vinfo))
+	t.Vinfo = nil
+}
 
 func InitDnnEngine(dnncfg VideoProfile) {
 	if initengine == false {
@@ -580,25 +612,38 @@ func ReleaseDnnEngine() {
 }
 
 //for multiple model
+//variable for vertical extention
+//var dnnMatrix [][]DnnSet
+//var dnnsets []DnnSet //now used
+//var gpunum int = 0
+//var gpuparallel int = 1
+
+func SetAvailableGpuNum(ngpu int) int {
+	gpunum = ngpu
+	//set tensorflow device setting
+	return gpunum
+}
+func GetAvailableGpuNum() int {
+	return gpunum
+}
+
+func SetParallelGpuNum(parallel int) int {
+	gpuparallel = parallel
+	if gpuparallel > 0 {
+		dnnsets = make([]DnnSet, gpuparallel)
+	}
+	return gpuparallel
+}
+func GetParallelGpuNum() int {
+	return gpuparallel
+}
+
 func NewDnnFilter() *DnnFilter {
 	return &DnnFilter{
 		handle:  C.lpms_dnnnew(),
 		initdnn: false,
 		stopped: true,
 		mu:      &sync.Mutex{},
-	}
-}
-func RegistryDnnEngine(dnncfg VideoProfile) {
-
-	dnnfilter := NewDnnFilter()
-	dnnfilter.dnncfg = dnncfg
-	if dnnfilter.InitDnnFilter(dnncfg) == true {
-		dnnfilters = append(dnnfilters, *dnnfilter)
-	}
-}
-func RemoveAllDnnEngine() {
-	for _, filter := range dnnfilters {
-		filter.StopDnnFilter()
 	}
 }
 func (t *DnnFilter) InitDnnFilter(dnncfg VideoProfile) bool {
@@ -663,22 +708,17 @@ func (t *DnnFilter) StopDnnFilter() {
 	t.initdnn = false
 }
 
-func NewDnnVinfo() *VideoInfo {
-	return &VideoInfo{
-		Vinfo: C.lpms_vinfonew(),
-		init:  false,
+//gloabal API
+func RegistryDnnEngine(dnncfg VideoProfile) {
+
+	dnnfilter := NewDnnFilter()
+	dnnfilter.dnncfg = dnncfg
+	if dnnfilter.InitDnnFilter(dnncfg) == true {
+		dnnfilters = append(dnnfilters, *dnnfilter)
 	}
 }
-func (t *VideoInfo) GetVideoInfo(infname string) string {
-	fname := C.CString(infname)
-	defer C.free(unsafe.Pointer(fname))
-	C.lpms_getvideoinfo(fname, t.Vinfo)
-
-	srtret := fmt.Sprintf("%vX%v @ %vfps %v sec", int(t.Vinfo.width), int(t.Vinfo.height), float32(t.Vinfo.fps), float32(t.Vinfo.duration))
-
-	return srtret
-}
-func (t *VideoInfo) DeleteDnnVinfo() {
-	C.free(unsafe.Pointer(t.Vinfo))
-	t.Vinfo = nil
+func RemoveAllDnnEngine() {
+	for _, filter := range dnnfilters {
+		filter.StopDnnFilter()
+	}
 }
