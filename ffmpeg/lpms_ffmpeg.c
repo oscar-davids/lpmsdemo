@@ -1549,9 +1549,9 @@ static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char
 
     sess_opts = TF_NewSessionOptions();
     // protobuf data for auto memory gpu_options.allow_growth=True and gpu_options.visible_device_list="0" 
-	  //uint8_t config[10] = { 0x32, 0x5, 0x20, 0x1, 0x2a, 0x01, 0x30, 0x00, 0x00, }; 
+    uint8_t config[10] = { 0x32, 0x5, 0x20, 0x1, 0x2a, 0x01, 0x30, 0x00, 0x00, }; 
     //config[6] += gpuid;  
-	  //TF_SetConfig(sess_opts, (void*)config, 7, tf_model->status);
+    TF_SetConfig(sess_opts, (void*)config, 7, tf_model->status);
 
     tf_model->session = TF_NewSession(tf_model->graph, sess_opts, tf_model->status);
     TF_DeleteSessionOptions(sess_opts);
