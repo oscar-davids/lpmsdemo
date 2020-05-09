@@ -36,3 +36,71 @@ if __name__ == '__main__':
 
                 prev_gray = gray                
                 count += 1
+///////////////////////////////////////////////////////////////////////////////
+
+def main():
+    parser = argparse.ArgumentParser(description='image splite to train and validate for training ')
+    parser.add_argument('--infolder', type=str, help='image folder path ')
+    parser.add_argument('--classname', type=str, help='splite class name')
+    parser.add_argument('--step', type=int, help='step for loop')
+    parser.add_argument('--maxsample', type=int, help='max train data count')
+
+    args = parser.parse_args()
+
+    infolder = args.infolder
+    classname = args.classname
+    step = args.step
+    maxval = args.maxsample
+
+
+    traindir = "train/" + classname + "/"
+    validationdir = "validation/" + classname + "/"
+
+    try:
+        os.makedirs(traindir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    try:
+        os.makedirs(validationdir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
+    fileset = [file for file in glob.glob(infolder + "**/*.jpg", recursive=True)]
+
+    count = len(fileset)
+    i = 0
+    k = 0
+    for file in fileset:        
+        if i % step == 0:
+            print(file)
+            fname = os.path.basename(file)
+            if k % 10 == 0: #test
+                destination_file = validationdir + fname
+            else:#train
+                destination_file = traindir + fname
+
+            try:
+                srcimg = cv2.imread(file)
+                dstimg = cv2.resize(srcimg, (224, 224), interpolation=cv2.INTER_CUBIC)
+                cv2.imwrite(destination_file, dstimg)
+                #copyfile(file, destination_file)               
+
+            except:
+                pass
+                
+            k = k + 1
+            
+            if k >= maxval:
+                break
+                
+        i = i + 1
+        progress(i, count, status='processing')
+        
+
+    print("\nTask Completed")
+
+
+if __name__== "__main__":
+    main()
