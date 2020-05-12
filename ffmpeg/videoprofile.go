@@ -66,7 +66,7 @@ var (
 		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}}
 	PDnnVioFilter = VideoProfile{Name: "PDnnVioFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tvmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_2/Reshape",
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tvmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, MetaMode: 0, ClassName: []string{"violence"}}}
 	PDnnOtherFilter = VideoProfile{Name: "PDnnOtherFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
 		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel2.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
