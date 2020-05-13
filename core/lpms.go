@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/lpms/ffmpeg"
-	"github.com/livepeer/lpms/segmenter"
-	"github.com/livepeer/lpms/stream"
-	"github.com/livepeer/lpms/vidlistener"
-	"github.com/livepeer/lpms/vidplayer"
-	"github.com/livepeer/m3u8"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/segmenter"
+	"github.com/oscar-davids/lpmsdemo/stream"
+	"github.com/oscar-davids/lpmsdemo/vidlistener"
+	"github.com/oscar-davids/lpmsdemo/vidplayer"
+	"github.com/oscar-davids/m3u8"
 
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
 )

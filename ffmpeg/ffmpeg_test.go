@@ -1077,7 +1077,7 @@ func TestTranscoder_RepeatedTranscodes(t *testing.T) {
 func TestTranscoder_MismatchedEncodeDecode(t *testing.T) {
 	// Encoded frame count does not match decoded frame count for mp4
 	// Note this is not an issue for mpegts! (this is sanity checked)
-	// See: https://github.com/livepeer/lpms/issues/155
+	// See: https://github.com/oscar-davids/lpmsdemo/issues/155
 
 	run, dir := setupTest(t)
 	defer os.RemoveAll(dir)

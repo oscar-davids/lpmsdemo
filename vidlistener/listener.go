@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/lpms/segmenter"
-	"github.com/livepeer/lpms/stream"
+	"github.com/oscar-davids/lpmsdemo/segmenter"
+	"github.com/oscar-davids/lpmsdemo/stream"
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
 )
 

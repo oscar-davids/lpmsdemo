@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/livepeer/lpms/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
 )
 
 func Over1Pct(val int, cmp int) bool {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/livepeer/lpms/stream"
+	"github.com/oscar-davids/lpmsdemo/stream"
 	"github.com/livepeer/joy4/av/pubsub"
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
 )

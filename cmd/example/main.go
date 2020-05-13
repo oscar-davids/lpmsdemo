@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/livepeer/lpms/transcoder"
+	"github.com/oscar-davids/lpmsdemo/transcoder"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/lpms/core"
-	"github.com/livepeer/lpms/ffmpeg"
-	"github.com/livepeer/lpms/segmenter"
-	"github.com/livepeer/lpms/stream"
-	"github.com/livepeer/m3u8"
+	"github.com/oscar-davids/lpmsdemo/core"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/segmenter"
+	"github.com/oscar-davids/lpmsdemo/stream"
+	"github.com/oscar-davids/m3u8"
 )
 
 var HLSWaitTime = time.Second * 10

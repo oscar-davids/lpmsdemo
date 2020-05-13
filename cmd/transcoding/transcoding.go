@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/livepeer/lpms/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
 )
 
 func validRenditions() []string {

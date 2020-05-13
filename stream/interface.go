@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/livepeer/joy4/av"
-	"github.com/livepeer/m3u8"
+	"github.com/oscar-davids/m3u8"
 )
 
 type AppData interface {

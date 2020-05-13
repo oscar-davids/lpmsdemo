@@ -20,14 +20,14 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/lpms/ffmpeg"
-	"github.com/livepeer/lpms/stream"
-	"github.com/livepeer/lpms/vidplayer"
-	"github.com/livepeer/m3u8"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
 	"github.com/livepeer/joy4/format"
 	"github.com/livepeer/joy4/format/rtmp"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/stream"
+	"github.com/oscar-davids/lpmsdemo/vidplayer"
+	"github.com/oscar-davids/m3u8"
 )
 
 type TestStream struct{}

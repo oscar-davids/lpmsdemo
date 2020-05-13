@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/lpms/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
 )
 
 //SegmentTranscoder transcodes segments individually.  This is a simple wrapper for calling FFMpeg on the command line.
