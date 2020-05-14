@@ -86,6 +86,17 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	if seg.PgDataEnd == true {
+		s.plCache.SetDiscontinuity()
+	}
+	if seg.PgDataTime == true {
+		now := time.Now()
+		s.plCache.SetProgramDateTime(now)
+	}
+	
+	if seg.FgContents == ContentsStart {
+		
+	}
 	//Add segment to media playlist and buffer
 	s.plCache.AppendSegment(&m3u8.MediaSegment{SeqId: seg.SeqNo, Duration: seg.Duration, URI: seg.Name})
 	s.segNames = append(s.segNames, seg.Name)

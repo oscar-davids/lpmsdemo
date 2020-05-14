@@ -662,7 +662,7 @@ func TestNewMasterPlaylistWithAlternatives(t *testing.T) {
 	if m.ver != 4 {
 		t.Fatalf("Expected version 4, actual, %d", m.ver)
 	}
-	fmt.Printf("%v\n", m)
+	//fmt.Printf("%v\n", m)
 }
 
 // Create new master playlist supporting CLOSED-CAPTIONS=NONE
@@ -979,9 +979,31 @@ func TestMasterPlaylistDirtyFlag(t *testing.T) {
 	m.Encode()
 	assert.False(m.dirty)
 }
-
-
-
+func TestProgramDateTimeForMediaPlaylistNow(t *testing.T) {
+	var e error
+	p, e := NewMediaPlaylist(3, 4)
+	if e != nil {
+		t.Fatalf("Create media playlist failed: %s", e)
+	}
+	p.Close()
+	if e = p.Append("test01.ts", 5.0, ""); e != nil {
+		t.Errorf("Add 1st segment to a media playlist failed: %s", e)
+	}
+	if e = p.Append("test02.ts", 6.0, ""); e != nil {
+		t.Errorf("Add 2nd segment to a media playlist failed: %s", e)
+	}	
+	now := time.Now()	
+	if e = p.SetProgramDateTime(now); e != nil {
+		t.Error("Can't set program date and time")
+	}
+	if e = p.SetDiscontinuity(); e != nil {
+		t.Error("Can't set discontinuity tag")
+	}
+	if e = p.Append("test03.ts", 6.0, ""); e != nil {
+		t.Errorf("Add 3nd segment to a media playlist failed: %s", e)
+	}
+	fmt.Println(p.Encode().String())
+}
 // Create new media playlist,
 // Set date range.
 func TestNewMasterPlaylistSetDateRange(t *testing.T) {
@@ -1064,7 +1086,7 @@ func TestNewMasterPlaylistSetDateRange(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		p, e := NewMediaPlaylist(1, 1)
 		if e != nil {
 			t.Fatalf("Create media playlist failed: %s", e)
@@ -1092,6 +1114,9 @@ func TestNewMasterPlaylistSetDateRange(t *testing.T) {
 			if !strings.Contains(actualResult, expected) {
 				t.Errorf("Test '%s' did not contain: %q, playlist: %v", test.Name, expected, actualResult)
 			}
+		}
+		if i == len(tests)-1 {
+			fmt.Println(p.Encode().String())
 		}
 	}
 }

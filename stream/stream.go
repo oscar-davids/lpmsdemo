@@ -29,6 +29,13 @@ func MakeVideoFormatType(base uint32) (c VideoFormat) {
 	return
 }
 
+const (
+	ContentsNone = iota
+	ContentsStart
+	ContentsContinue
+	ContentsEnd
+)
+
 const avFormatTypeMagic = 577777
 const videoFormatOtherBits = 1
 
@@ -75,6 +82,11 @@ type HLSSegment struct {
 	Name     string
 	Data     []byte
 	Duration float64
+	PgDataTime bool
+	PgDataEnd bool
+	FgContents int //0:Contents None, 1:ContentsStart, 2:ContentsContinue, 3:ContentsEnd
+	
+	
 }
 
 //Compare playlists by segments

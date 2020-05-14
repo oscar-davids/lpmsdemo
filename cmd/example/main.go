@@ -321,19 +321,34 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 				}
 				//glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
 				sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
+				PgDataTime := false
+				PgDataEnd := false
+				FgContents := 0 //0:Contents None, 1:ContentsStart, 2:ContentsContinue, 3:ContentsEnd
+
 				if len(precontents) == 0 && len(contents) == 0 { //normal
-					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 2}); err != nil {
-						glog.Errorf("Error writing transcoded seg: %v", err)
-					}
+					//write normal mode
+					FgContents = stream.ContentsNone
 				} else if len(precontents) == 0 && len(contents) > 0 { //started other contents
 					//write EXT-X-PROGRAM-DATE-TIME start
-					//write EXT-X-DATERANGE
+					//write EXT-X-DATERANGE start
+					PgDataTime = true
+					FgContents = stream.ContentsStart
 
 				} else if len(precontents) > 0 && len(contents) > 0 { //continue other contents
+					//write EXT-X-DATERANGE continue
+					FgContents = stream.ContentsContinue
 
 				} else if len(precontents) > 0 && len(contents) == 0 { //ended other contents
-					//write EXT-X-DISCONTINUITY at end of EXT-X-PROGRAM-DATE-TIME  
-				}				
+					//write EXT-X-DISCONTINUITY at end of EXT-X-PROGRAM-DATE-TIME
+					//write EXT-X-DATERANGE end
+					PgDataEnd = true
+					FgContents = stream.ContentsEnd					
+				}
+				
+				if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], 
+					Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
+					glog.Errorf("Error writing transcoded seg: %v", err)
+				}
 			}
 		}
 		precontents = contents
