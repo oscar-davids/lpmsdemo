@@ -86,16 +86,40 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	now := time.Now()
 	if seg.PgDataEnd == true {
 		s.plCache.SetDiscontinuity()
 	}
-	if seg.PgDataTime == true {
-		now := time.Now()
+	if seg.PgDataTime == true {		
 		s.plCache.SetProgramDateTime(now)
 	}
-	
-	if seg.FgContents == ContentsStart {
-		
+	SCTE35Intag := ""
+	SCTE35Commandtag := ""
+	SCTE35Outtag := ""
+	switch seg.FgContents {
+	case ContentsStart:	
+		SCTE35Intag = "test"
+	case ContentsContinue:
+		SCTE35Commandtag = "test"
+	case ContentsEnd:
+		SCTE35Outtag = "test"
+	case ContentsNone:
+	}
+	if seg.FgContents > ContentsNone {
+		DateRange := &m3u8.DateRange{
+			ID:               "id1",
+			StartDate:        now,
+			Duration:         seg.Duration*2,
+			PlannedDuration:  seg.Duration,
+			Class:            "class",
+			EndDate:          now,
+			ClientAttributes: m3u8.ClientAttributes{"X-COM-EXAMPLE-AD-ID": "XYZ123"},
+			SCTE35In:         SCTE35Intag,
+			SCTE35Out:        SCTE35Commandtag,
+			SCTE35Command:    SCTE35Outtag,
+			EndOnNext:        "YES",
+		}
+		s.plCache.SetDateRange(DateRange)
 	}
 	//Add segment to media playlist and buffer
 	s.plCache.AppendSegment(&m3u8.MediaSegment{SeqId: seg.SeqNo, Duration: seg.Duration, URI: seg.Name})
