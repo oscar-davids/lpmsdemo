@@ -300,6 +300,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 	if gpuid >= 0 {
 		t.SetGpuID(gpuid)
 	}
+	precontents := ""
 
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
 		//If we get a new video segment for the original HLS stream, do the transcoding.
@@ -307,7 +308,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		//getfile := ".tmp/" + seg.Name
 		getfile := workDir + seg.Name
 		//Transcode stream
-		tData, _, err := t.Transcode(getfile)
+		tData, contents, err := t.Transcode(getfile)
 		if err != nil {
 			glog.Errorf("Error transcoding: %v", err)
 		} else {
@@ -320,12 +321,22 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 				}
 				//glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
 				sName := fmt.Sprintf("%v_%v.ts", strmID, seg.SeqNo)
+				if len(precontents) == 0 && len(contents) == 0 { //normal
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 2}); err != nil {
+						glog.Errorf("Error writing transcoded seg: %v", err)
+					}
+				} else if len(precontents) == 0 && len(contents) > 0 { //started other contents
+					//write EXT-X-PROGRAM-DATE-TIME start
+					//write EXT-X-DATERANGE
 
-				if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], Duration: 2}); err != nil {
-					glog.Errorf("Error writing transcoded seg: %v", err)
-				}
+				} else if len(precontents) > 0 && len(contents) > 0 { //continue other contents
+
+				} else if len(precontents) > 0 && len(contents) == 0 { //ended other contents
+					//write EXT-X-DISCONTINUITY at end of EXT-X-PROGRAM-DATE-TIME  
+				}				
 			}
 		}
+		precontents = contents
 	}
 
 	return subscriber, nil
