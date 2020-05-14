@@ -307,7 +307,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		//getfile := ".tmp/" + seg.Name
 		getfile := workDir + seg.Name
 		//Transcode stream
-		tData, err := t.Transcode(getfile)
+		tData, _, err := t.Transcode(getfile)
 		if err != nil {
 			glog.Errorf("Error transcoding: %v", err)
 		} else {

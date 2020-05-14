@@ -72,6 +72,7 @@ type TranscodeResults struct {
 	Decoded    MediaInfo
 	Encoded    []MediaInfo
 	DetectProb float32
+	Contents   string
 }
 
 //for multiple model
@@ -129,7 +130,7 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 }
 
 //call subscriber
-func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile) error {
+func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile) (string, error) {
 	sdev := fmt.Sprintf("%d", gid)
 	opts := make([]TranscodeOptions, len(ps))
 	for i, param := range ps {
@@ -149,7 +150,12 @@ func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile
 		Device:     sdev,
 		ParallelID: pid,
 	}
-	return Transcode2(inopts, opts)
+	return TranscodeAndDetection(inopts, opts)
+}
+
+func TranscodeAndDetection(input *TranscodeOptionsIn, ps []TranscodeOptions) (string, error) {
+	res, err := Transcode3(input, ps)
+	return res.Contents, err
 }
 
 func newAVOpts(opts map[string]string) *C.AVDictionary {
@@ -572,7 +578,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		Pixels: int64(decoded.pixels),
 	}
 
-	return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
+	return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
 }
 
 func NewTranscoder() *Transcoder {
