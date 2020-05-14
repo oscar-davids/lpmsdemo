@@ -19,7 +19,7 @@ import (
 	"github.com/golang/glog"
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
 	"github.com/oscar-davids/lpmsdemo/stream"
-	"github.com/oscar-davids/m3u8"
+	"github.com/oscar-davids/lpmsdemo/m3u8"
 )
 
 var ErrNotFound = errors.New("ErrNotFound")

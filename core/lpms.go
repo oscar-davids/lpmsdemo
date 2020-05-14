@@ -16,7 +16,7 @@ import (
 	"github.com/oscar-davids/lpmsdemo/stream"
 	"github.com/oscar-davids/lpmsdemo/vidlistener"
 	"github.com/oscar-davids/lpmsdemo/vidplayer"
-	"github.com/oscar-davids/m3u8"
+	"github.com/oscar-davids/lpmsdemo/m3u8"
 
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
 )

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/oscar-davids/m3u8"
+	"github.com/oscar-davids/lpmsdemo/m3u8"
 )
 
 var ErrVideoManifest = errors.New("ErrVideoManifest")
