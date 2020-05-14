@@ -578,7 +578,13 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		Pixels: int64(decoded.pixels),
 	}
 
-	return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+	if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+	} else {
+		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence }, nil
+	}
+
+	
 }
 
 func NewTranscoder() *Transcoder {
