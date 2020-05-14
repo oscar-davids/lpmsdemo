@@ -105,6 +105,9 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 		SCTE35Outtag = "test"
 	case ContentsNone:
 	}
+
+	nanosec := int64(seg.Duration * 1000000000.0)
+	nowplus := now.Add(time.Duration(nanosec))
 	if seg.FgContents > ContentsNone {
 		DateRange := &m3u8.DateRange{
 			ID:               "id1",
@@ -112,8 +115,8 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 			Duration:         seg.Duration*2,
 			PlannedDuration:  seg.Duration,
 			Class:            "class",
-			EndDate:          now,
-			ClientAttributes: m3u8.ClientAttributes{"X-COM-EXAMPLE-AD-ID": "XYZ123"},
+			EndDate:          nowplus,
+			ClientAttributes: m3u8.ClientAttributes{"X-AD-URL": "http://ad.com/acme"},
 			SCTE35In:         SCTE35Intag,
 			SCTE35Out:        SCTE35Commandtag,
 			SCTE35Command:    SCTE35Outtag,

@@ -345,11 +345,23 @@ func (t *Transcoder) ExecuteSetFilter(infname string, Accel Acceleration) (subtf
 	if len(dnnfilters) > 0 {
 		bmetadata := false
 		bcontent := false
-		if dnnfilters[0].dnncfg.Detector.MetaMode == MpegMetadata {
+		if dnnfilters[0].dnncfg.Detector.MetaMode >= MpegMetadata {
 			bmetadata = true
 		}
-
-		if bmetadata == false {
+		if bmetadata == true { //not sub title mode
+			for i, ft := range dnnfilters {
+				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
+				if i == 0 {
+					fconfidence = confidence //for tranncoding sample
+				}
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
+					if len(srtmetadata) > 0 {
+						srtmetadata += ", "
+					}
+					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
+				}
+			}
+		} else { //subtitle mode
 			subtfname = "subtitle.srt"
 			srtfile, err := os.Create(subtfname)
 			if err == nil {
@@ -372,23 +384,8 @@ func (t *Transcoder) ExecuteSetFilter(infname string, Accel Acceleration) (subtf
 				subtfname = ""
 			}
 			srtfile.Close()
-		} else {
-			for i, ft := range dnnfilters {
-				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
-				if i == 0 {
-					fconfidence = confidence //for tranncoding sample
-				}
-				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
-					if len(srtmetadata) > 0 {
-						srtmetadata += ", "
-					}
-					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
-				}
-			}
 		}
-
 	}
-
 	return subtfname, srtmetadata, fconfidence
 }
 func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOptions) (*TranscodeResults, error) {
@@ -731,11 +728,20 @@ func (t *DnnSet) ExecuteSetDnnFilter(infname string, Accel Acceleration) (subtfn
 
 	if len(t.filters) > 0 {
 		bcontent := false
-		if t.filters[0].dnncfg.Detector.MetaMode == MpegMetadata {
+		if t.filters[0].dnncfg.Detector.MetaMode >= MpegMetadata {
 			bmetadata = true
 		}
-
-		if bmetadata == false {
+		if bmetadata == true { //not sub title mode
+			for _, ft := range t.filters {
+				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
+				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
+					if len(srtmetadata) > 0 {
+						srtmetadata += ", "
+					}
+					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
+				}
+			}
+		} else { //subtitle mode
 			subtfname = t.streamId + ".srt"
 			srtfile, err := os.Create(subtfname)
 			if err == nil {
@@ -755,16 +761,6 @@ func (t *DnnSet) ExecuteSetDnnFilter(infname string, Accel Acceleration) (subtfn
 				subtfname = ""
 			}
 			srtfile.Close()
-		} else {
-			for _, ft := range t.filters {
-				clsid, confidence := ft.ExecuteDnnFilter(infname, Accel)
-				if confidence >= ft.dnncfg.Detector.Threshold && clsid >= 0 && clsid < len(ft.dnncfg.Detector.ClassName) {
-					if len(srtmetadata) > 0 {
-						srtmetadata += ", "
-					}
-					srtmetadata += ft.dnncfg.Detector.ClassName[clsid]
-				}
-			}
 		}
 	}
 

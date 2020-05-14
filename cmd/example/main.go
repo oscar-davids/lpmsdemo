@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"io/ioutil"
 
 	"github.com/oscar-davids/lpmsdemo/transcoder"
 
@@ -301,6 +302,11 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		t.SetGpuID(gpuid)
 	}
 	precontents := ""
+	//load temp warning video(warning.ts)
+	warningbuff, err := ioutil.ReadFile("warning.ts")
+	if err != nil {
+		glog.Errorf("Cannot read temp warning video: %v", err)
+	}
 
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
 		//If we get a new video segment for the original HLS stream, do the transcoding.
@@ -345,9 +351,16 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 					FgContents = stream.ContentsEnd					
 				}
 				
-				if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], 
-					Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
-					glog.Errorf("Error writing transcoded seg: %v", err)
+				if len(contents) > 0 {
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff, 
+						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
+						glog.Errorf("Error writing transcoded seg: %v", err)
+					}
+				} else {
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], 
+						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
+						glog.Errorf("Error writing transcoded seg: %v", err)
+					}
 				}
 			}
 		}
