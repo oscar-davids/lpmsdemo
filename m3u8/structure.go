@@ -32,10 +32,11 @@ const (
 		   o  The EXT-X-MEDIA tag.
 		   o  The AUDIO and VIDEO attributes of the EXT-X-STREAM-INF tag.
 	*/
-	minver   = uint8(3)
-	DATETIME = time.RFC3339Nano // Format for EXT-X-PROGRAM-DATE-TIME defined in section 3.4.5
-	//START-DATE for EXT-X-DATERANGE in defined in section 4.3.2.7(ISO-8601) 
-	DATERANGE_DATETIME = "2020-05-13T14:00:00+08:00"
+	minver   = uint8(3)	
+	/* Format for EXT-X-PROGRAM-DATE-TIME defined in section 3.4.5 
+	 and EXT-X-DATERANGE in defined in section 4.3.2.7(ISO-8601)  
+	*/
+	DATETIME = time.RFC3339Nano 
 )
 
 type ListType uint

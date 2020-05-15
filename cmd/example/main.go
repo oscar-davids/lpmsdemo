@@ -170,7 +170,7 @@ func main() {
 			rtmpStrm = rs
 
 			// //Segment the video into HLS (If we need multiple outlets for the HLS stream, we'd need to create a buffer.  But here we only have one outlet for the transcoder)
-			hlsStrm = stream.NewBasicHLSVideoStream(randString(10), 3)
+			hlsStrm = stream.NewBasicHLSVideoStream(randString(10), 8)
 
 			var subscriber func(*stream.HLSSegment, bool)
 			subscriber, err = transcode(hlsStrm, *flagClass, *interval)
@@ -305,7 +305,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 	//load temp warning video(warning.ts)
 	warningbuff, err := ioutil.ReadFile("warning.ts")
 	if err != nil {
-		glog.Errorf("Cannot read temp warning video: %v", err)
+		glog.Errorf("Can not read temp warning video: %v", err)
 	}
 
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
@@ -352,6 +352,8 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 				}
 				
 				if len(contents) > 0 {
+					glog.Infof("Get Dnn filtering contents at pid %v :%v\n", pid, contents)
+
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff, 
 						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)

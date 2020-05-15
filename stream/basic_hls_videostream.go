@@ -87,10 +87,11 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	defer s.lock.Unlock()
 
 	now := time.Now()
-	if seg.PgDataEnd == true {
-		s.plCache.SetDiscontinuity()
-	}
-	if seg.PgDataTime == true {		
+	//if seg.PgDataEnd == true {
+	//	//s.plCache.SetDiscontinuity()
+	//	s.plCache.SetProgramDateTime(now)		
+	//}	
+	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd {
 		s.plCache.SetProgramDateTime(now)
 	}
 	SCTE35Intag := ""
@@ -98,29 +99,29 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	SCTE35Outtag := ""
 	switch seg.FgContents {
 	case ContentsStart:	
-		SCTE35Intag = "test"
+		SCTE35Outtag = "test"
 	case ContentsContinue:
 		SCTE35Commandtag = "test"
 	case ContentsEnd:
-		SCTE35Outtag = "test"
+		SCTE35Intag = "test"
 	case ContentsNone:
 	}
 
 	nanosec := int64(seg.Duration * 1000000000.0)
 	nowplus := now.Add(time.Duration(nanosec))
-	if seg.FgContents > ContentsNone {
+	nowplusend := now.Add(time.Duration(nanosec+nanosec))
+	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd {
 		DateRange := &m3u8.DateRange{
-			ID:               "id1",
-			StartDate:        now,
+			ID:               "2020",
+			StartDate:        nowplus,
 			Duration:         seg.Duration*2,
 			PlannedDuration:  seg.Duration,
 			Class:            "class",
-			EndDate:          nowplus,
+			EndDate:          nowplusend,
 			ClientAttributes: m3u8.ClientAttributes{"X-AD-URL": "http://ad.com/acme"},
 			SCTE35In:         SCTE35Intag,
-			SCTE35Out:        SCTE35Commandtag,
-			SCTE35Command:    SCTE35Outtag,
-			EndOnNext:        "YES",
+			SCTE35Out:        SCTE35Outtag,
+			SCTE35Command:    SCTE35Commandtag,			
 		}
 		s.plCache.SetDateRange(DateRange)
 	}

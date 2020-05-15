@@ -681,7 +681,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			p.buf.WriteString("ID=\"")
 			p.buf.WriteString(seg.DateRange.ID)
 			p.buf.WriteString("\",START-DATE=\"")
-			p.buf.WriteString(seg.DateRange.StartDate.Format(DATERANGE_DATETIME))
+			p.buf.WriteString(seg.DateRange.StartDate.Format(DATETIME))
 			p.buf.WriteString("\"")
 
 			if seg.DateRange.Class != "" {
@@ -702,7 +702,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 
 			if !seg.DateRange.EndDate.IsZero() {
 				p.buf.WriteString(",END-DATE=\"")
-				p.buf.WriteString(seg.DateRange.EndDate.Format(DATERANGE_DATETIME))
+				p.buf.WriteString(seg.DateRange.EndDate.Format(DATETIME))
 				p.buf.WriteString("\"")
 			}
 
@@ -713,13 +713,13 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 
 			if seg.DateRange.SCTE35Out != "" {
 				p.buf.WriteString(",SCTE35-OUT=")
-				p.buf.WriteString(seg.DateRange.SCTE35Command)
+				p.buf.WriteString(seg.DateRange.SCTE35Out)
 				p.buf.WriteString("\"")
 			}
 
 			if seg.DateRange.SCTE35In != "" {
 				p.buf.WriteString(",SCTE35-IN=")
-				p.buf.WriteString(seg.DateRange.SCTE35Command)
+				p.buf.WriteString(seg.DateRange.SCTE35In)
 			}
 
 			if seg.DateRange.EndOnNext != "" {

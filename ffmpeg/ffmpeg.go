@@ -575,13 +575,13 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		Pixels: int64(decoded.pixels),
 	}
 
-	if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+	if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+	} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
 	} else {
 		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence }, nil
-	}
-
-	
+	}	
 }
 
 func NewTranscoder() *Transcoder {
