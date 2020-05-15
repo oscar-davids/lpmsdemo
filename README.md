@@ -54,7 +54,7 @@ For classification needs a trained model file. Please change trained filename(ba
     
     dnnfilter: dnn model name for classification
     
-    metamode: select metadata store type.(0: subtitle(default), 1: ffmpeg metadata, 2: hls timed metadata(reservation)) 
+    metamode: select metadata store type.(0: subtitle(default), 1: ffmpeg metadata, 2: hls timed metadata) 
     
     gpucount: Nvidia GPU card count
     
