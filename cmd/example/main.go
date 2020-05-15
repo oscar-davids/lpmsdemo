@@ -91,6 +91,7 @@ func main() {
 	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
+	
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
 		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
