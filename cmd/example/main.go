@@ -90,7 +90,7 @@ func main() {
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
 	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
-	parallel := flag.Int("parallel", 2, "parallel processing count for clasiifier")
+	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
 		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
@@ -305,7 +305,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 	//load temp warning video(warning.ts)
 	warningbuff, err := ioutil.ReadFile("warning.ts")
 	if err != nil {
-		glog.Errorf("Can not read temp warning video: %v", err)
+		glog.Errorf("Can not read temp warning video(warning.ts): %v", err)
 	}
 
 	subscriber := func(seg *stream.HLSSegment, eof bool) {
