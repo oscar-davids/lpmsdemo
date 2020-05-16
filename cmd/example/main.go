@@ -7,22 +7,22 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"time"
-	"io/ioutil"
 
 	"github.com/oscar-davids/lpmsdemo/transcoder"
 
 	"github.com/golang/glog"
 	"github.com/oscar-davids/lpmsdemo/core"
 	"github.com/oscar-davids/lpmsdemo/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/m3u8"
 	"github.com/oscar-davids/lpmsdemo/segmenter"
 	"github.com/oscar-davids/lpmsdemo/stream"
-	"github.com/oscar-davids/lpmsdemo/m3u8"
 )
 
 var HLSWaitTime = time.Second * 10
@@ -91,7 +91,7 @@ func main() {
 	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
-	
+
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
 		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
@@ -171,7 +171,7 @@ func main() {
 			rtmpStrm = rs
 
 			// //Segment the video into HLS (If we need multiple outlets for the HLS stream, we'd need to create a buffer.  But here we only have one outlet for the transcoder)
-			hlsStrm = stream.NewBasicHLSVideoStream(randString(10), 8)
+			hlsStrm = stream.NewBasicHLSVideoStream(randString(10), 5)
 
 			var subscriber func(*stream.HLSSegment, bool)
 			subscriber, err = transcode(hlsStrm, *flagClass, *interval)
@@ -349,18 +349,18 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 					//write EXT-X-DISCONTINUITY at end of EXT-X-PROGRAM-DATE-TIME
 					//write EXT-X-DATERANGE end
 					PgDataEnd = true
-					FgContents = stream.ContentsEnd					
+					FgContents = stream.ContentsEnd
 				}
-				
+
 				if len(contents) > 0 {
 					glog.Infof("Get Dnn filtering contents at pid %v :%v\n", pid, contents)
 
-					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff, 
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff,
 						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				} else {
-					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i], 
+					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i],
 						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
