@@ -9,12 +9,19 @@ import (
 )
 
 const (
+	DnnClassify = iota
+	DnnObject
+	DnnMasking
+)
+
+const (
 	Subtitle = iota
 	MpegMetadata
 	HLSMetadata
 )
 
 type DetectorProfile struct {
+	Dnntype    int
 	SampleRate uint
 	ModelPath  string
 	Threshold  float32

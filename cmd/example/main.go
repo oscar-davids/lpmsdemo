@@ -91,18 +91,19 @@ func main() {
 	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
+	embededdnn := flag.Int("embededdnn", 0, "if this flag set 1 then run tanscoding and claasify at same C engine")
 
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
+		panic("Usage sample: appname -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
 			continue
 		}
-		if strings.Index(s, "-classid=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-parallel=") < 0 &&
+		if strings.Index(s, "-embededdnn=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-parallel=") < 0 &&
 			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 && strings.Index(s, "-gpucount=") < 0 {
-			panic("Usage sample: appname -classid=0 -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2")
+			panic("Usage sample: appname -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
 		}
 	}
 	//check dnnfilter
@@ -142,6 +143,8 @@ func main() {
 	//loading dnnmodule only once
 	//ffmpeg.InitDnnEngine(ffmpeg.PDnnDetector)
 	//Register Dnn filter into Transcode Engine
+	cengginflag := *embededdnn == 1
+	ffmpeg.SetCengineFlag(cengginflag)
 	ffmpeg.SetAvailableGpuNum(*gpucount)
 	ffmpeg.SetParallelGpuNum(*parallel)
 

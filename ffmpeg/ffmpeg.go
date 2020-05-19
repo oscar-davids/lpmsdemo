@@ -396,6 +396,21 @@ func (t *Transcoder) ExecuteSetFilter(infname string, Accel Acceleration) (subtf
 	}
 	return subtfname, srtmetadata, fconfidence
 }
+func (t *Transcoder) GetContentString(dnnid int, classid int, prob float32) string {
+	srtmetadata := ""
+
+	if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata &&
+		dnnid >= 0 && dnnid < len(dnnsets[0].filters) && classid >= 0 && classid < len(dnnsets[0].filters[dnnid].dnncfg.Detector.ClassName) {
+		srtmetadata = dnnsets[0].filters[dnnid].dnncfg.Detector.ClassName[classid]
+	} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata &&
+		dnnid >= 0 && dnnid < len(dnnfilters) && classid >= 0 && classid < len(dnnfilters[dnnid].dnncfg.Detector.ClassName) {
+		srtmetadata = dnnfilters[dnnid].dnncfg.Detector.ClassName[classid]
+	}
+	if len(srtmetadata) > 0 {
+		srtmetadata = "content:" + srtmetadata + ","
+	}
+	return srtmetadata
+}
 func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOptions) (*TranscodeResults, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -587,12 +602,39 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		Pixels: int64(decoded.pixels),
 	}
 
-	if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
-		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
-	} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
-		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+	if usednnCengine == false {
+		if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+		} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+		} else {
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
+		}
 	} else {
-		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
+		tempdata := C.GoString((*C.char)(unsafe.Pointer(&decoded.desc)))
+		srtmetadata = ""
+		if len(tempdata) > 0 {
+			token := strings.Split(tempdata, ",")
+			for _, sval := range token {
+				strval := strings.Split(sval, ":")
+				if len(strval) == 3 {
+					dnnid, err1 := strconv.Atoi(strval[0])
+					classid, err2 := strconv.Atoi(strval[1])
+					fprob, err3 := strconv.ParseFloat(strval[2], 32)
+					if err1 != nil && err2 != nil && err3 != nil {
+						srtmetadata += t.GetContentString(dnnid, classid, float32(fprob))
+					}
+				}
+			}
+		}
+
+		if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+		} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
+		} else {
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
+		}
 	}
 }
 
@@ -785,6 +827,9 @@ func (t *DnnSet) ReleaseSetDnnFilter() {
 
 	for _, filter := range t.filters {
 		filter.StopDnnFilter()
+		if usednnCengine == true {
+			C.lpms_dnnCdelete(filter.handle)
+		}
 	}
 	t.streamId = ""
 }
@@ -797,6 +842,9 @@ func (t *DnnSet) ReleaseSetDnnFilter() {
 //var dnnsets []DnnSet //now used
 //var gpunum int = 0
 //var gpuparallel int = 1
+func SetCengineFlag(flag bool) {
+	usednnCengine = flag
+}
 
 func SetAvailableGpuNum(ngpu int) int {
 	gpunum = ngpu
@@ -921,6 +969,9 @@ func RegistryDnnEngine(dnncfg VideoProfile) {
 			if dnnfilter.InitDnnFilter(dnncfg) == true {
 				dnnsets[i].filters = append(dnnsets[i].filters, *dnnfilter)
 				//glog.Infof("RegistryDnnEngine debug-1: %v", len(dnnsets[i].filters))
+				if usednnCengine == true {
+					C.lpms_dnnCappend(dnnfilter.handle)
+				}
 			}
 		}
 		//glog.Infof("RegistryDnnEngine debug-2 %v", len(dnnsets[0].filters))
@@ -930,6 +981,9 @@ func RegistryDnnEngine(dnncfg VideoProfile) {
 		dnnfilter.dnncfg = dnncfg
 		if dnnfilter.InitDnnFilter(dnncfg) == true {
 			dnnfilters = append(dnnfilters, *dnnfilter)
+			if usednnCengine == true {
+				C.lpms_dnnCappend(dnnfilter.handle)
+			}
 		}
 	}
 	if usednnCengine == true && ftimeinterval == 0.0 {
@@ -941,10 +995,12 @@ func RemoveAllDnnEngine() {
 		for i, _ := range dnnsets {
 			dnnsets[i].ReleaseSetDnnFilter()
 		}
-
 	} else {
 		for _, filter := range dnnfilters {
 			filter.StopDnnFilter()
+			if usednnCengine == true {
+				C.lpms_dnnCdelete(filter.handle)
+			}
 		}
 	}
 

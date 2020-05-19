@@ -92,6 +92,7 @@ DnnFilterNode* Filters = NULL;
 int DnnFilterNum = 0;
 
 static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in);
+static int  prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW);
 
 void append_filter(LVPDnnContext* lvpdnn)
 {
@@ -155,24 +156,52 @@ void scanlist() {
     t = t->next;
   }  
 }
-void classifylist(struct AVFrame *frame) {
+void initcontextlist() {
   DnnFilterNode *t;
+  int ret = 0;
+  t = Filters;
+  if (t == NULL) {    
+    return;
+  }
+  while (t != NULL) {      
+      if(t->data->fmatching && t->data->output.height){
+        memset(t->data->fmatching, 0x00, sizeof(float)*t->data->output.height);
+      }
+      t->data->runcount = 0;
+      t = t->next;
+  }
+}
+
+void classifylist(struct AVFrame *frame, int flagHW) {
+  DnnFilterNode *t;
+  int ret = 0;
   t = Filters;
   if (t == NULL) {    
     return;
   }
   while (t != NULL) {
-    lpms_detectoneframewithctx(t->data,frame);
-    t = t->next;
+      if(t->data->sws_rgb_scale == NULL || t->data->sws_gray8_to_grayf32 == NULL)
+      {
+        ret = prepare_sws_context(t->data, frame, flagHW);
+        if(ret < 0){
+          av_log(NULL, AV_LOG_INFO, "Can not create scale context!\n");
+          t = t->next;
+          continue;
+        }
+      }
+      lpms_detectoneframewithctx(t->data,frame);
+      t = t->next;
   }
 }
 void getclassifyresult(int runcount, char* strbuffer) {
   DnnFilterNode *t;
   char stemp[MAXPATH] = {0,};
+  int dnnid = 0;
   t = Filters;
   if (t == NULL) {    
     return;
-  } 
+  }
+  
   while (t != NULL) {
     //get confidence order 
     float prob = 0.0;
@@ -189,12 +218,15 @@ void getclassifyresult(int runcount, char* strbuffer) {
     if(runcount > 1) {
       prob = prob / (float)runcount;
     }
-    if(prob >= t->data->valid_threshold){
-      sprintf(stemp,"%d:%f,", classid, prob);
+    if(prob >= t->data->valid_threshold)
+    {
+      sprintf(stemp,"%d:%d:%f,", dnnid, classid, prob);
       //strcat
       strcat(strbuffer, stemp);
+      av_log(0, AV_LOG_ERROR, "Engine Dnnid Classid & Probability = %d %d %f\n", dnnid, classid, prob);
     }
     t = t->next;
+    dnnid++;
   }
 }
 //
@@ -1242,13 +1274,14 @@ int transcode(struct transcode_thread *h,
   int nb_outputs = h->nb_outputs;
   AVPacket ipkt;
   AVFrame *dframe = NULL;
+  //added module for classify
   int runclassify = 0;
   int nsamplerate = 0;
-
+  int flagHW = AV_HWDEVICE_TYPE_CUDA == ictx->hw_type;
   if(inp->ftimeinterval > 0.0) nsamplerate = (int)(nsamplerate * inp->ftimeinterval);
   else if(Filters != NULL) nsamplerate = Filters->data->sample_rate;
-
   if(nsamplerate == 0) nsamplerate = 30;
+  initcontextlist();
 
   if (!inp) main_err("transcoder: Missing input params\n")
 
@@ -1357,8 +1390,11 @@ int transcode(struct transcode_thread *h,
         ictx->next_pts_v = dframe->pts + dur;
         //invoke call classification
         if(DnnFilterNum > 0 && decoded_results->frames % nsamplerate == 1){
+           
           runclassify++;
-          classifylist(dframe);          
+          //for DEBUG
+          //av_log(0, AV_LOG_INFO, "DnnFilterNum num frame nsamplerate = %d %d\n",DnnFilterNum,decoded_results->frames,nsamplerate);
+          classifylist(dframe, flagHW);          
         }
       }
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
@@ -1672,7 +1708,6 @@ static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char
         TF_CloseSession(tf_model->session, tf_model->status);
         TF_DeleteSession(tf_model->session, tf_model->status);
     }
-
     sess_opts = TF_NewSessionOptions();
     // protobuf data for auto memory gpu_options.allow_growth=True and gpu_options.visible_device_list="0" 
     uint8_t config[10] = { 0x32, 0x5, 0x20, 0x1, 0x2a, 0x01, 0x30, 0x00, 0x00, }; 
@@ -1694,7 +1729,8 @@ static DNNReturnType set_input_output_tf(void *model, DNNData *input, const char
                       &init_op, 1, NULL, tf_model->status);
         if (TF_GetCode(tf_model->status) != TF_OK)
         {
-            return DNN_ERROR;
+            //av_log(NULL, AV_LOG_ERROR, "%d %d\n", __LINE__, TF_GetCode(tf_model->status));
+            return DNN_ERROR;            
         }
     }
 
@@ -1942,7 +1978,10 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
   //if(ctx->sample_rate > 0 && ctx->framenum % ctx->sample_rate == 0 &&
   //  copy_from_frame_to_dnn(ctx, in) == DNN_SUCCESS)
 
-  if(copy_from_frame_to_dnn(ctx, in) != DNN_SUCCESS) return DNN_ERROR;
+  if(copy_from_frame_to_dnn(ctx, in) != DNN_SUCCESS) {
+    av_log(NULL, AV_LOG_ERROR, "frame_to_dnn function failed for classification\n");
+    return DNN_ERROR;
+  }
 
   dnn_result = (ctx->dnn_module->execute_model)(ctx->model, &ctx->output, 1);
   if (dnn_result != DNN_SUCCESS){
@@ -1957,6 +1996,8 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       ctx->fmatching[k] += pfdata[k];
     }
     ctx->runcount ++;
+    //for DEBUG
+    //av_log(0, AV_LOG_INFO, "classification num runcount = %d %d\n",ctx->output.height,ctx->runcount);
   }
   /*
   char slvpinfo[256] = {0,};
