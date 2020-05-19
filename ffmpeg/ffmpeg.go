@@ -107,6 +107,7 @@ var gpuparallel int = 0
 var gpunum int = 0
 var gpuusage []GpuStatus
 var usednnCengine bool = false
+var ftimeinterval float32 = 0.0
 
 //in the future
 //var dnnMatrix [][]DnnSet
@@ -555,8 +556,10 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		smetadata = C.CString(srtmetadata)
 		defer C.free(unsafe.Pointer(smetadata))
 	}
+
 	inp := &C.input_params{fname: fname, hw_type: hw_type, device: device, metadata: smetadata,
-		handle: t.handle}
+		handle: t.handle, ftimeinterval: C.float(ftimeinterval)}
+
 	results := make([]C.output_results, len(ps))
 	decoded := &C.output_results{}
 	var (
@@ -928,6 +931,9 @@ func RegistryDnnEngine(dnncfg VideoProfile) {
 		if dnnfilter.InitDnnFilter(dnncfg) == true {
 			dnnfilters = append(dnnfilters, *dnnfilter)
 		}
+	}
+	if usednnCengine == true && ftimeinterval == 0.0 {
+		ftimeinterval = dnncfg.Detector.Interval
 	}
 }
 func RemoveAllDnnEngine() {

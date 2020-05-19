@@ -166,7 +166,7 @@ void classifylist(struct AVFrame *frame) {
     t = t->next;
   }
 }
-void getclassifyresult(char* strbuffer) {
+void getclassifyresult(int runcount, char* strbuffer) {
   DnnFilterNode *t;
   char stemp[MAXPATH] = {0,};
   t = Filters;
@@ -186,14 +186,14 @@ void getclassifyresult(char* strbuffer) {
         }
     }  
 
-    if(t->data->runcount > 1) {
-      prob = prob / (float)t->data->runcount;
+    if(runcount > 1) {
+      prob = prob / (float)runcount;
     }
-    //if first     
-    sprintf(stemp,"%d:%f,",classid,prob);
-    //strcat
-    strcat(strbuffer, stemp);
-
+    if(prob >= t->data->valid_threshold){
+      sprintf(stemp,"%d:%f,", classid, prob);
+      //strcat
+      strcat(strbuffer, stemp);
+    }
     t = t->next;
   }
 }
@@ -1242,6 +1242,13 @@ int transcode(struct transcode_thread *h,
   int nb_outputs = h->nb_outputs;
   AVPacket ipkt;
   AVFrame *dframe = NULL;
+  int runclassify = 0;
+  int nsamplerate = 0;
+
+  if(inp->ftimeinterval > 0.0) nsamplerate = (int)(nsamplerate * inp->ftimeinterval);
+  else if(Filters != NULL) nsamplerate = Filters->data->sample_rate;
+
+  if(nsamplerate == 0) nsamplerate = 30;
 
   if (!inp) main_err("transcoder: Missing input params\n")
 
@@ -1349,8 +1356,9 @@ int transcode(struct transcode_thread *h,
         }
         ictx->next_pts_v = dframe->pts + dur;
         //invoke call classification
-        if(DnnFilterNum > 0){
-          classifylist(dframe);
+        if(DnnFilterNum > 0 && decoded_results->frames % nsamplerate == 1){
+          runclassify++;
+          classifylist(dframe);          
         }
       }
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
@@ -1409,7 +1417,7 @@ whileloop_end:
   }
   //make classification result
   if(DnnFilterNum > 0){
-
+    getclassifyresult(runclassify,decoded_results->desc);
   }
 
 transcode_cleanup:

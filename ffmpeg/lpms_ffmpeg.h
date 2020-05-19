@@ -47,6 +47,7 @@ typedef struct {
   char *device;
   //for ffmpeg metadata. if not null, write ffmpeg metadata.
   char *metadata;
+  float ftimeinterval;
 } input_params;
 
 typedef struct {
