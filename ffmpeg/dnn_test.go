@@ -233,6 +233,70 @@ func BenchmarkDnnSW_AllDigitalExecutetime(b *testing.B) {
 	fmt.Println(totalreport)
 }
 
+func BenchmarkDnnSW_AllCombineExecutetime(b *testing.B) {
+
+	totalreport := ""
+	//0x no classify only transcoding
+	//1x ,2x, 3x, ... 6x
+	SetCengineFlag(true)
+
+	for s := 0; s <= 64; {
+		dnncfg := PDnnDetector
+		dnncfg.Detector.SampleRate = uint(s)
+		dnncfg.Detector.Interval = 0.0
+
+		RegistryDnnEngine(dnncfg)
+
+		var err error
+		fname := "../data/bunny2.mp4"
+		oname := "outbunny2.ts"
+		prof := P720p25fps16x9
+		start := time.Now()
+		for i := 0; i < b.N; i++ {
+			// hw dec, hw enc
+			err = Transcode2(&TranscodeOptionsIn{
+				Fname: fname,
+				Accel: Software,
+			}, []TranscodeOptions{
+				{
+					Oname:   oname,
+					Profile: prof,
+					Accel:   Software,
+				},
+			})
+			if err != nil {
+				b.Error(err)
+			}
+
+			os.Remove(oname)
+		}
+		elapsed := time.Since(start)
+		elasec := elapsed.Seconds() / float64(b.N)
+
+		RemoveAllDnnEngine()
+
+		tvinfo := NewDnnVinfo()
+		vinfo := tvinfo.GetVideoInfo(fname)
+		tvinfo.DeleteDnnVinfo()
+		//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
+		evalreport := fmt.Sprintf("Run %vx = classify(1) and transcoding(%v %v) at video(%v) : %v sec\n", dnncfg.Detector.SampleRate,
+			prof.Resolution, prof.Framerate, vinfo, elasec)
+
+		if s == 0 {
+			s = 1
+			evalreport = strings.Replace(evalreport, "classify(1)", "no classify", 1)
+		} else {
+			s *= 2
+		}
+		totalreport += evalreport
+
+		fmt.Println(evalreport)
+
+	}
+
+	fmt.Println(totalreport)
+}
+
 //go test -run DnnHW -bench DnnHW
 func BenchmarkDnnHW_Transcodingtime(b *testing.B) {
 
@@ -367,6 +431,70 @@ func BenchmarkDnnHW_AllDigitalExecutetime(b *testing.B) {
 		elapsed := time.Since(start)
 		elasec := elapsed.Seconds() / float64(b.N)
 		dnnfilter.StopDnnFilter()
+
+		tvinfo := NewDnnVinfo()
+		vinfo := tvinfo.GetVideoInfo(fname)
+		tvinfo.DeleteDnnVinfo()
+		//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
+		evalreport := fmt.Sprintf("Run %vx = classify(1) and transcoding(%v %v) at video(%v) : %v sec\n", dnncfg.Detector.SampleRate,
+			prof.Resolution, prof.Framerate, vinfo, elasec)
+
+		if s == 0 {
+			s = 1
+			evalreport = strings.Replace(evalreport, "classify(1)", "no classify", 1)
+		} else {
+			s *= 2
+		}
+		totalreport += evalreport
+
+		fmt.Println(evalreport)
+
+	}
+
+	fmt.Println(totalreport)
+}
+
+func BenchmarkDnnHW_AllCombineExecutetime(b *testing.B) {
+
+	totalreport := ""
+	//0x no classify only transcoding
+	//1x ,2x, 3x, ... 6x
+	SetCengineFlag(true)
+
+	for s := 0; s <= 64; {
+		dnncfg := PDnnDetector
+		dnncfg.Detector.SampleRate = uint(s)
+		dnncfg.Detector.Interval = 0.0
+
+		RegistryDnnEngine(dnncfg)
+
+		var err error
+		fname := "../data/bunny2.mp4"
+		oname := "outbunny2.ts"
+		prof := P720p25fps16x9
+		start := time.Now()
+		for i := 0; i < b.N; i++ {
+			// hw dec, hw enc
+			err = Transcode2(&TranscodeOptionsIn{
+				Fname: fname,
+				Accel: Nvidia,
+			}, []TranscodeOptions{
+				{
+					Oname:   oname,
+					Profile: prof,
+					Accel:   Nvidia,
+				},
+			})
+			if err != nil {
+				b.Error(err)
+			}
+
+			os.Remove(oname)
+		}
+		elapsed := time.Since(start)
+		elasec := elapsed.Seconds() / float64(b.N)
+
+		RemoveAllDnnEngine()
 
 		tvinfo := NewDnnVinfo()
 		vinfo := tvinfo.GetVideoInfo(fname)

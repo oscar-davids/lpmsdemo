@@ -828,10 +828,10 @@ func (t *DnnSet) StopSetDnnFilter() {
 func (t *DnnSet) ReleaseSetDnnFilter() {
 
 	for _, filter := range t.filters {
-		filter.StopDnnFilter()
 		if usednnCengine == true {
 			C.lpms_dnnCdelete(filter.handle)
 		}
+		filter.StopDnnFilter()
 	}
 	t.streamId = ""
 }
@@ -999,10 +999,10 @@ func RemoveAllDnnEngine() {
 		}
 	} else {
 		for _, filter := range dnnfilters {
-			filter.StopDnnFilter()
 			if usednnCengine == true {
 				C.lpms_dnnCdelete(filter.handle)
 			}
+			filter.StopDnnFilter()
 		}
 	}
 
