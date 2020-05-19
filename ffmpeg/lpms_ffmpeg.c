@@ -91,6 +91,8 @@ struct transcode_thread {
 DnnFilterNode* Filters = NULL;
 int DnnFilterNum = 0;
 
+static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in);
+
 void append_filter(LVPDnnContext* lvpdnn)
 {
   DnnFilterNode *t, *temp;
@@ -143,7 +145,58 @@ void remove_filter(LVPDnnContext* lvpdnn)
     t = t->next;
   }
 }
+void scanlist() {
+  DnnFilterNode *t;
+  t = Filters;
+  if (t == NULL) {    
+    return;
+  }
+  while (t->next != NULL) {    
+    t = t->next;
+  }  
+}
+void classifylist(struct AVFrame *frame) {
+  DnnFilterNode *t;
+  t = Filters;
+  if (t == NULL) {    
+    return;
+  }
+  while (t != NULL) {
+    lpms_detectoneframewithctx(t->data,frame);
+    t = t->next;
+  }
+}
+void getclassifyresult(char* strbuffer) {
+  DnnFilterNode *t;
+  char stemp[MAXPATH] = {0,};
+  t = Filters;
+  if (t == NULL) {    
+    return;
+  } 
+  while (t != NULL) {
+    //get confidence order 
+    float prob = 0.0;
+    int classid = -1; 
+    float* confidences = (float*)t->data->fmatching;
+    for (int i = 0; i < t->data->output.height; i++)
+    {
+        if(confidences[i] > prob) {
+          prob = confidences[i];
+          classid = i;
+        }
+    }  
 
+    if(t->data->runcount > 1) {
+      prob = prob / (float)t->data->runcount;
+    }
+    //if first     
+    sprintf(stemp,"%d:%f,",classid,prob);
+    //strcat
+    strcat(strbuffer, stemp);
+
+    t = t->next;
+  }
+}
 //
 // Transcoder
 //
@@ -1295,6 +1348,10 @@ int transcode(struct transcode_thread *h,
           //fprintf(stderr, "Could not determine next pts; filter might drop\n");
         }
         ictx->next_pts_v = dframe->pts + dur;
+        //invoke call classification
+        if(DnnFilterNum > 0){
+          classifylist(dframe);
+        }
       }
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
       if (has_frame) ictx->next_pts_a = dframe->pts + dframe->pkt_duration;
@@ -1349,6 +1406,10 @@ whileloop_end:
   for (i = 0; i < nb_outputs; i++) {
     ret = flush_outputs(ictx, &outputs[i]);
     if (ret < 0) main_err("transcoder: Unable to fully flush outputs")
+  }
+  //make classification result
+  if(DnnFilterNum > 0){
+
   }
 
 transcode_cleanup:
@@ -1880,6 +1941,15 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
+
+  if(ctx->filter_type == 0 && ctx->fmatching != NULL){
+    float* pfdata = (float*)ctx->output.data;
+    for (int k = 0; k < ctx->output.height; k++)
+    {
+      ctx->fmatching[k] += pfdata[k];
+    }
+    ctx->runcount ++;
+  }
   /*
   char slvpinfo[256] = {0,};
   float* pfdata = ctx->output.data;
@@ -2393,6 +2463,16 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
       av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
+
+  if(ctx->filter_type == 0){
+    ctx->fmatching = malloc((ctx->output.height + 1) * sizeof(float));
+    if(ctx->fmatching == NULL){
+        av_log(NULL, AV_LOG_ERROR, "can not creat matching buffer\n");
+        return AVERROR(EIO);
+    }
+    memset(ctx->fmatching, 0x00, (ctx->output.height + 1) * sizeof(float));
+  }
+  
   //av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
   return DNN_SUCCESS;
 }
@@ -2431,6 +2511,8 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
     free(context->model_inputname);
   if(context->model_outputname)
     free(context->model_outputname);
+  if(context->fmatching)
+    free(context->fmatching);
   if(context)
     av_free(context);
   context = NULL;
@@ -2617,6 +2699,15 @@ LVPDnnContext*  lpms_dnnnew()
 void lpms_dnnstop(LVPDnnContext* context)
 {
   lpms_dnnfreewithctx(context);  
+}
+
+void lpms_dnnCappend(LVPDnnContext* context)
+{
+  append_filter(context);
+}
+void lpms_dnnCdelete(LVPDnnContext* context)
+{
+  remove_filter(context);
 }
 
 Vinfo*  lpms_vinfonew()

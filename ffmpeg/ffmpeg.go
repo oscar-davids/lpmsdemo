@@ -106,6 +106,7 @@ var dnnsets []DnnSet //now used
 var gpuparallel int = 0
 var gpunum int = 0
 var gpuusage []GpuStatus
+var usednnCengine bool = false
 
 //in the future
 //var dnnMatrix [][]DnnSet
@@ -129,7 +130,7 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 	return nil
 }
 
-//call subscriber
+//call from subscriber
 func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile) (string, error) {
 	sdev := fmt.Sprintf("%d", gid)
 	opts := make([]TranscodeOptions, len(ps))
@@ -215,6 +216,12 @@ func Transcode2(input *TranscodeOptionsIn, ps []TranscodeOptions) error {
 }
 
 func Transcode3(input *TranscodeOptionsIn, ps []TranscodeOptions) (*TranscodeResults, error) {
+	t := NewTranscoder()
+	defer t.StopTranscoder()
+	return t.Transcode(input, ps)
+}
+
+func Transcode4(input *TranscodeOptionsIn, ps []TranscodeOptions) (*TranscodeResults, error) {
 	t := NewTranscoder()
 	defer t.StopTranscoder()
 	return t.Transcode(input, ps)
@@ -425,15 +432,17 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	var srtmetadata string = ""
 	var fconfidence float32 = 0.0
 
-	if gpuparallel > 0 {
-		glog.Infof("Parallel ID / Parallel Count: %v/%v\n", input.ParallelID, gpuparallel)
+	if usednnCengine == false {
+		if gpuparallel > 0 {
+			glog.Infof("Parallel ID / Parallel Count: %v/%v\n", input.ParallelID, gpuparallel)
 
-		if input.ParallelID >= 0 && input.ParallelID < gpuparallel {
-			subtfname, srtmetadata = dnnsets[input.ParallelID].ExecuteSetDnnFilter(input.Fname, input.Accel)
+			if input.ParallelID >= 0 && input.ParallelID < gpuparallel {
+				subtfname, srtmetadata = dnnsets[input.ParallelID].ExecuteSetDnnFilter(input.Fname, input.Accel)
+			}
+
+		} else {
+			subtfname, srtmetadata, fconfidence = t.ExecuteSetFilter(input.Fname, input.Accel)
 		}
-
-	} else {
-		subtfname, srtmetadata, fconfidence = t.ExecuteSetFilter(input.Fname, input.Accel)
 	}
 
 	params := make([]C.output_params, len(ps))
@@ -467,7 +476,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		if param.Framerate > 0 {
 			filters = fmt.Sprintf("fps=%d/1,", param.Framerate)
 		}
-		if len(subtfname) > 0 {
+		if usednnCengine == false && len(subtfname) > 0 {
 			if input.Accel == Software {
 				filters += fmt.Sprintf("subtitles=%v,", subtfname)
 			} else {
@@ -541,7 +550,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		defer C.free(unsafe.Pointer(device))
 	}
 	var smetadata *C.char = nil
-	if len(srtmetadata) > 0 {
+	if usednnCengine == false && len(srtmetadata) > 0 { //ffmpeg meta data mode
 		//glog.Infof("DnnFilter metadata: %v", srtmetadata)
 		smetadata = C.CString(srtmetadata)
 		defer C.free(unsafe.Pointer(smetadata))
@@ -580,8 +589,8 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
 	} else {
-		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence }, nil
-	}	
+		return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
+	}
 }
 
 func NewTranscoder() *Transcoder {

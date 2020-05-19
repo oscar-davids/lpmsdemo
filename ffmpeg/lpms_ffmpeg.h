@@ -4,6 +4,10 @@
 #include <libavutil/hwcontext.h>
 #include <libavutil/rational.h>
 
+#ifndef MAXPATH
+#define MAXPATH 256
+#endif
+
 // LPMS specific errors
 extern const int lpms_ERR_INPUT_PIXFMT;
 extern const int lpms_ERR_FILTERS;
@@ -46,8 +50,9 @@ typedef struct {
 } input_params;
 
 typedef struct {
-    int frames;
+    int     frames;
     int64_t pixels;
+    char    desc[MAXPATH];
 } output_results;
 
 
@@ -63,9 +68,7 @@ void lpms_transcode_stop(struct transcode_thread* handle);
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
-#ifndef MAXPATH
-#define MAXPATH 256
-#endif
+
 #define MAX_DNNFILTER 8 //multiple model max
 
 typedef enum {DNN_FLOAT = 1, DNN_UINT8 = 4} DNNDataType;
@@ -143,7 +146,9 @@ typedef struct LVPDnnContext {
 	enum AVHWDeviceType type;
 	AVBufferRef 		*hw_device_ctx;
 	enum AVPixelFormat 	hw_pix_fmt;	
-	
+	//for inference probability
+    float               *fmatching;
+    int                 runcount;
 	// for log file
     FILE                *logfile;
     int                 framenum;
@@ -164,6 +169,9 @@ LVPDnnContext*  lpms_dnnnew();
 int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char* output, int samplerate, float fthreshold, int gpuid);
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob);
 void lpms_dnnstop(LVPDnnContext* context);
+
+void lpms_dnnCappend(LVPDnnContext* context);
+void lpms_dnnCdelete(LVPDnnContext* context);
 
 Vinfo*  lpms_vinfonew();
 int     lpms_getvideoinfo(char* ivpath, Vinfo* vinfo);
