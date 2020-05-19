@@ -621,12 +621,14 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 					dnnid, err1 := strconv.Atoi(strval[0])
 					classid, err2 := strconv.Atoi(strval[1])
 					fprob, err3 := strconv.ParseFloat(strval[2], 32)
-					if err1 != nil && err2 != nil && err3 != nil {
+					if err1 == nil && err2 == nil && err3 == nil {
 						srtmetadata += t.GetContentString(dnnid, classid, float32(fprob))
 					}
 				}
 			}
 		}
+		//for debug
+		//glog.Infof("Dnn filtering contents metadata : %v %v\n", tempdata, srtmetadata)
 
 		if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
