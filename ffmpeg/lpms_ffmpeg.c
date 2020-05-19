@@ -87,6 +87,63 @@ struct transcode_thread {
 
 };
 
+//merge transcoding and classify for multi model
+DnnFilterNode* Filters = NULL;
+int DnnFilterNum = 0;
+
+void append_filter(LVPDnnContext* lvpdnn)
+{
+  DnnFilterNode *t, *temp;
+  if(lvpdnn == NULL) return;
+
+  t = (DnnFilterNode*)malloc(sizeof(DnnFilterNode));
+  t->data = lvpdnn;
+  DnnFilterNum++;
+
+  if (Filters == NULL) {
+    Filters = t;
+    Filters->next = NULL;
+    return;
+  }
+
+  temp = Filters;
+  while (temp->next != NULL)
+    temp = temp->next;
+
+  temp->next = t;
+  t->next   = NULL;
+}
+void remove_filter(LVPDnnContext* lvpdnn)
+{
+  DnnFilterNode *t, *tpre, *temp;
+  
+  if (Filters == NULL || lvpdnn == NULL) {    
+    return;
+  }
+
+  t = Filters;
+
+  while (t != NULL)  {
+    //printf("%d\n", t->data);
+    if(lvpdnn == t->data){
+      if(t == Filters){        
+        temp = Filters->next;
+        free(Filters);
+        Filters = temp;
+        DnnFilterNum--;
+      } else {
+        temp = t->next;
+        free(t);
+        tpre->next = temp;
+        DnnFilterNum--;
+      }      
+      break;
+    }
+    tpre = t;
+    t = t->next;
+  }
+}
+
 //
 // Transcoder
 //

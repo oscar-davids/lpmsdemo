@@ -66,6 +66,7 @@ void lpms_transcode_stop(struct transcode_thread* handle);
 #ifndef MAXPATH
 #define MAXPATH 256
 #endif
+#define MAX_DNNFILTER 8 //multiple model max
 
 typedef enum {DNN_FLOAT = 1, DNN_UINT8 = 4} DNNDataType;
 typedef enum {DNN_NATIVE, DNN_TF} DNNBackendType;
@@ -148,6 +149,11 @@ typedef struct LVPDnnContext {
     int                 framenum;
 
 } LVPDnnContext;
+
+typedef struct DnnFilterNode {
+  LVPDnnContext *data;
+  struct DnnFilterNode *next;
+} DnnFilterNode;
 
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 void  	lpms_dnnfree();
