@@ -326,7 +326,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 			//Insert into HLS stream
 			//for i, strmID := range strmIDs
 			for i, p := range profiles {
-				if p.Name == "PDnnDetector" {
+				if strings.Index(p.Name, "PDnn") >= 0 {
 					continue
 				}
 				//glog.Infof("Inserting transcoded seg %v into strm: %v", len(tData[i]), strmID)
