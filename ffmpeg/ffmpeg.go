@@ -997,6 +997,7 @@ func RemoveAllDnnEngine() {
 		for i, _ := range dnnsets {
 			dnnsets[i].ReleaseSetDnnFilter()
 		}
+		dnnsets = make([]DnnSet, 0)
 	} else {
 		for _, filter := range dnnfilters {
 			if usednnCengine == true {
@@ -1004,6 +1005,7 @@ func RemoveAllDnnEngine() {
 			}
 			filter.StopDnnFilter()
 		}
+		dnnfilters = make([]DnnFilter, 0)
 	}
 
 }

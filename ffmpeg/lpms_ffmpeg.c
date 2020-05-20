@@ -100,7 +100,7 @@ int DnnFilterNum = 0;
 static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in);
 static int  prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW);
 
-void append_filter(LVPDnnContext* lvpdnn)
+void lpms_dnnCappend(LVPDnnContext* lvpdnn)
 {
   DnnFilterNode *t, *temp;
   if(lvpdnn == NULL) return;
@@ -111,8 +111,7 @@ void append_filter(LVPDnnContext* lvpdnn)
 
   if (Filters == NULL) {
     Filters = t;
-    Filters->next = NULL;
-    av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
+    Filters->next = NULL;    
     return;
   }
 
@@ -122,16 +121,11 @@ void append_filter(LVPDnnContext* lvpdnn)
 
   temp->next = t;
   t->next   = NULL;
-  av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
-
 }
-void remove_filter(LVPDnnContext* lvpdnn)
+void lpms_dnnCdelete(LVPDnnContext* lvpdnn)
 {
   DnnFilterNode *t, *tpre, *temp;
   t = tpre = temp = NULL;
-  
-  Filters = NULL;
-  DnnFilterNum = 0;
 
   if (Filters == NULL || lvpdnn == NULL) {
     return;
@@ -147,20 +141,20 @@ void remove_filter(LVPDnnContext* lvpdnn)
         temp = Filters->next;
         free(Filters);
         Filters = temp;
-        DnnFilterNum--;
-        av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
+        DnnFilterNum--;        
       } else {
         temp = t->next;
         free(t);
         if(tpre)
           tpre->next = temp;
-        DnnFilterNum--;
-        av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
+        DnnFilterNum--;        
       }      
       break;
-    }
-    tpre = t;
-    t = t->next;
+
+    } else {
+      tpre = t;
+      t = t->next;
+    }    
   }
 }
 void scanlist() {
@@ -186,7 +180,7 @@ void initcontextlist() {
       }
       t->data->runcount = 0;
       t = t->next;
-  }
+  }  
 }
 void cleancontextlist() {
   DnnFilterNode *t;
@@ -198,22 +192,40 @@ void cleancontextlist() {
   while (t != NULL) {
       LVPDnnContext *context = t->data;
       if(context != NULL) {
-          if(context->readframe)
+          if(context->readframe){
               av_frame_free(&context->readframe);
-          if(context->swscaleframe)
+              context->readframe = NULL;
+          }
+          if(context->swscaleframe){
               av_frame_free(&context->swscaleframe);
-          if(context->swframeforHW)
+              context->swscaleframe = NULL;
+          }
+          if(context->swframeforHW){
               av_frame_free(&context->swframeforHW);
-
-          sws_freeContext(context->sws_rgb_scale);
-          context->sws_rgb_scale = NULL;
-          sws_freeContext(context->sws_gray8_to_grayf32);
-          context->sws_gray8_to_grayf32 = NULL;
+              context->swframeforHW = NULL;
+          }
+          if(context->sws_rgb_scale){
+            sws_freeContext(context->sws_rgb_scale);
+            context->sws_rgb_scale = NULL;
+          }
+          if(context->sws_gray8_to_grayf32){
+            sws_freeContext(context->sws_gray8_to_grayf32);
+            context->sws_gray8_to_grayf32 = NULL;
+          }
           //release avcontext
-
-          avcodec_free_context(&context->decoder_ctx);
-          avformat_close_input(&context->input_ctx);
-          av_buffer_unref(&context->hw_device_ctx);
+          if(context->decoder_ctx){
+            avcodec_free_context(&context->decoder_ctx);
+            context->decoder_ctx = NULL;
+          }
+          if(context->input_ctx){
+            avformat_close_input(&context->input_ctx);
+            context->input_ctx = NULL;
+          }  
+          if(context->hw_device_ctx){
+            context->hw_device_ctx = NULL;
+            av_buffer_unref(&context->hw_device_ctx);
+          }
+          
           context->runcount = 0;
       }
       
@@ -1327,10 +1339,10 @@ int transcode(struct transcode_thread *h,
   int runclassify = 0;
   int nsamplerate = 0;
   int flagHW = AV_HWDEVICE_TYPE_CUDA == ictx->hw_type;
-  if(inp->ftimeinterval > 0.0) nsamplerate = (int)(nsamplerate * inp->ftimeinterval);
-  else if(Filters != NULL) nsamplerate = Filters->data->sample_rate;
-  if(nsamplerate == 0) nsamplerate = 30;
-  initcontextlist();  
+  if(inp->ftimeinterval > 0.0) nsamplerate = (int)(25.0 * inp->ftimeinterval);
+  else  nsamplerate = Filters->data->sample_rate;  
+  initcontextlist();
+  //av_log(0, AV_LOG_ERROR, "nsamplerate = %d \n",nsamplerate);
 
   if (!inp) main_err("transcoder: Missing input params\n")
 
@@ -1438,7 +1450,7 @@ int transcode(struct transcode_thread *h,
         }
         ictx->next_pts_v = dframe->pts + dur;
         //invoke call classification
-        if(DnnFilterNum > 0 && nsamplerate > 0 && decoded_results->frames % nsamplerate == 1){
+        if(DnnFilterNum > 0 && nsamplerate > 0 && (decoded_results->frames - 1) % nsamplerate == 0){
           runclassify++;
           //for DEBUG
           //av_log(0, AV_LOG_INFO, "DnnFilterNum num frame nsamplerate = %d %d\n",DnnFilterNum,decoded_results->frames,nsamplerate);
@@ -2032,7 +2044,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
-  /*
+
   if(ctx->filter_type == 0 && ctx->fmatching != NULL){
     float* pfdata = (float*)ctx->output.data;
     for (int k = 0; k < ctx->output.height; k++)
@@ -2043,7 +2055,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
     //for DEBUG
     //av_log(0, AV_LOG_INFO, "classification num runcount = %d %d\n",ctx->output.height,ctx->runcount);
   }
-  */
+
   /*
   char slvpinfo[256] = {0,};
   float* pfdata = ctx->output.data;
@@ -2558,13 +2570,14 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
       return AVERROR(EIO);
   }
 
-  if(ctx->filter_type == 0){
-    ctx->fmatching = malloc((ctx->output.height + 1) * sizeof(float));
+  if(ctx->filter_type == 0){    
+    ctx->fmatching = (float*)malloc((ctx->output.height + 1) * sizeof(float));
     if(ctx->fmatching == NULL){
         av_log(NULL, AV_LOG_ERROR, "can not creat matching buffer\n");
         return AVERROR(EIO);
     }
     memset(ctx->fmatching, 0x00, (ctx->output.height + 1) * sizeof(float));
+    //av_log(NULL, AV_LOG_ERROR, "ctx->fmatching create success\n");
   }
   
   //av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
@@ -2583,7 +2596,8 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
   if (context->dnn_module)
       (context->dnn_module->free_model)(&context->model);
 
-  av_freep(&context->dnn_module);
+  if(context->dnn_module)
+    av_freep(&context->dnn_module);
 
   if(context->readframe)
 		av_frame_free(&context->readframe);
@@ -2599,19 +2613,27 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
       fclose(context->logfile);
   }
 
-  if(context->model_filename)
+  if(context->model_filename){
     free(context->model_filename);
-  if(context->model_inputname)
+    context->model_filename = NULL;
+  }
+  if(context->model_inputname){
     free(context->model_inputname);
-  if(context->model_outputname)
+    context->model_inputname = NULL;
+  }    
+  if(context->model_outputname){
     free(context->model_outputname);
-  if(context->fmatching)
+    context->model_outputname = NULL;
+  }
+  if(context->fmatching){
     free(context->fmatching);
+    context->fmatching = NULL;
+  }
 
   if(context)
     av_free(context);
+
   context = NULL;
-    
 }
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob)
 {
@@ -2789,20 +2811,12 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
 LVPDnnContext*  lpms_dnnnew()
 {
   LVPDnnContext *ctx = (LVPDnnContext*)av_mallocz(sizeof(LVPDnnContext));
+  if(ctx) ctx->filter_type = 0;
   return ctx;
 }
 void lpms_dnnstop(LVPDnnContext* context)
 {
   lpms_dnnfreewithctx(context);  
-}
-
-void lpms_dnnCappend(LVPDnnContext* context)
-{
-  append_filter(context);
-}
-void lpms_dnnCdelete(LVPDnnContext* context)
-{
-  remove_filter(context);
 }
 
 Vinfo*  lpms_vinfonew()
