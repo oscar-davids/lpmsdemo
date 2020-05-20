@@ -172,12 +172,12 @@ func TestTranscoder_UnevenRes(t *testing.T) {
 	`
 	run(cmd)
 
-	err := Transcode(dir+"/test.mp4", dir, []VideoProfile{P240p30fps16x9})
+	_, err := Transcode(dir+"/test.mp4", dir, 0, 0, []VideoProfile{P240p30fps16x9})
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = Transcode(dir+"/test_larger.mp4", dir, []VideoProfile{P240p30fps16x9})
+	_, err = Transcode(dir+"/test_larger.mp4", dir, 0, 0, []VideoProfile{P240p30fps16x9})
 	if err != nil {
 		t.Error(err)
 	}
@@ -201,7 +201,7 @@ func TestTranscoder_UnevenRes(t *testing.T) {
 	`
 	run(cmd)
 
-	err = Transcode(dir+"/transposed.mp4", dir, []VideoProfile{P240p30fps16x9})
+	_, err = Transcode(dir+"/transposed.mp4", dir, 0, 0, []VideoProfile{P240p30fps16x9})
 	if err != nil {
 		t.Error(err)
 	}
@@ -223,7 +223,7 @@ func TestTranscoder_UnevenRes(t *testing.T) {
 	`
 	run(cmd)
 
-	err = Transcode(dir+"/square.mp4", dir, []VideoProfile{P240p30fps16x9})
+	_, err = Transcode(dir+"/square.mp4", dir, 0, 0, []VideoProfile{P240p30fps16x9})
 	if err != nil {
 		t.Error(err)
 	}
@@ -272,7 +272,7 @@ func TestTranscoder_SampleRate(t *testing.T) {
 	`
 	run(cmd)
 
-	err := Transcode(dir+"/test.ts", dir, []VideoProfile{P240p30fps16x9})
+	_, err := Transcode(dir+"/test.ts", dir, 0, 0, []VideoProfile{P240p30fps16x9})
 	if err != nil {
 		t.Error(err)
 	}
@@ -322,7 +322,7 @@ func TestTranscoder_Timestamp(t *testing.T) {
 	`
 	run(cmd)
 
-	err := Transcode(dir+"/test.ts", dir, []VideoProfile{P240p30fps16x9})
+	_, err := Transcode(dir+"/test.ts", dir, 0, 0, []VideoProfile{P240p30fps16x9})
 	if err != nil {
 		t.Error(err)
 	}

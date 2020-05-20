@@ -11,6 +11,12 @@
 
 #include <pthread.h>
 
+#ifdef _ADD_LPMS_DNN_
+#include "libswscale/swscale.h"
+#include "libavutil/imgutils.h"
+#include "tensorflow/c/c_api.h"
+#endif
+
 // Not great to appropriate internal API like this...
 const int lpms_ERR_INPUT_PIXFMT = FFERRTAG('I','N','P','X');
 const int lpms_ERR_FILTERS = FFERRTAG('F','L','T','R');
@@ -106,6 +112,7 @@ void append_filter(LVPDnnContext* lvpdnn)
   if (Filters == NULL) {
     Filters = t;
     Filters->next = NULL;
+    av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
     return;
   }
 
@@ -115,12 +122,18 @@ void append_filter(LVPDnnContext* lvpdnn)
 
   temp->next = t;
   t->next   = NULL;
+  av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
+
 }
 void remove_filter(LVPDnnContext* lvpdnn)
 {
   DnnFilterNode *t, *tpre, *temp;
+  t = tpre = temp = NULL;
   
-  if (Filters == NULL || lvpdnn == NULL) {    
+  Filters = NULL;
+  DnnFilterNum = 0;
+
+  if (Filters == NULL || lvpdnn == NULL) {
     return;
   }
 
@@ -129,16 +142,20 @@ void remove_filter(LVPDnnContext* lvpdnn)
   while (t != NULL)  {
     //printf("%d\n", t->data);
     if(lvpdnn == t->data){
-      if(t == Filters){        
+      t->data = NULL;
+      if(t == Filters){
         temp = Filters->next;
         free(Filters);
         Filters = temp;
         DnnFilterNum--;
+        av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
       } else {
         temp = t->next;
         free(t);
-        tpre->next = temp;
+        if(tpre)
+          tpre->next = temp;
         DnnFilterNum--;
+        av_log(0, AV_LOG_ERROR, "DnnFilterNum = %d %d\n", DnnFilterNum, __LINE__);
       }      
       break;
     }
@@ -163,11 +180,43 @@ void initcontextlist() {
   if (t == NULL) {    
     return;
   }
-  while (t != NULL) {      
-      if(t->data->fmatching && t->data->output.height){
+  while (t != NULL) {
+      if(t->data->fmatching && t->data->output.height > 0){
         memset(t->data->fmatching, 0x00, sizeof(float)*t->data->output.height);
       }
       t->data->runcount = 0;
+      t = t->next;
+  }
+}
+void cleancontextlist() {
+  DnnFilterNode *t;
+  int ret = 0;
+  t = Filters;
+  if (t == NULL) {    
+    return;
+  }
+  while (t != NULL) {
+      LVPDnnContext *context = t->data;
+      if(context != NULL) {
+          if(context->readframe)
+              av_frame_free(&context->readframe);
+          if(context->swscaleframe)
+              av_frame_free(&context->swscaleframe);
+          if(context->swframeforHW)
+              av_frame_free(&context->swframeforHW);
+
+          sws_freeContext(context->sws_rgb_scale);
+          context->sws_rgb_scale = NULL;
+          sws_freeContext(context->sws_gray8_to_grayf32);
+          context->sws_gray8_to_grayf32 = NULL;
+          //release avcontext
+
+          avcodec_free_context(&context->decoder_ctx);
+          avformat_close_input(&context->input_ctx);
+          av_buffer_unref(&context->hw_device_ctx);
+          context->runcount = 0;
+      }
+      
       t = t->next;
   }
 }
@@ -1281,7 +1330,7 @@ int transcode(struct transcode_thread *h,
   if(inp->ftimeinterval > 0.0) nsamplerate = (int)(nsamplerate * inp->ftimeinterval);
   else if(Filters != NULL) nsamplerate = Filters->data->sample_rate;
   if(nsamplerate == 0) nsamplerate = 30;
-  initcontextlist();
+  initcontextlist();  
 
   if (!inp) main_err("transcoder: Missing input params\n")
 
@@ -1389,8 +1438,7 @@ int transcode(struct transcode_thread *h,
         }
         ictx->next_pts_v = dframe->pts + dur;
         //invoke call classification
-        if(DnnFilterNum > 0 && decoded_results->frames % nsamplerate == 1){
-           
+        if(DnnFilterNum > 0 && nsamplerate > 0 && decoded_results->frames % nsamplerate == 1){
           runclassify++;
           //for DEBUG
           //av_log(0, AV_LOG_INFO, "DnnFilterNum num frame nsamplerate = %d %d\n",DnnFilterNum,decoded_results->frames,nsamplerate);
@@ -1454,6 +1502,7 @@ whileloop_end:
   //make classification result
   if(DnnFilterNum > 0){
     getclassifyresult(runclassify,decoded_results->desc);
+    cleancontextlist();
   }
 
 transcode_cleanup:
@@ -1533,11 +1582,6 @@ void lpms_transcode_stop(struct transcode_thread *handle) {
 }
 
 #ifdef _ADD_LPMS_DNN_
-
-#include "libswscale/swscale.h"
-#include "libavutil/imgutils.h"
-#include "tensorflow/c/c_api.h"
-
 
 DNNModel *ff_dnn_load_model_tf(const char *model_filename);
 
@@ -1988,7 +2032,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
-
+  /*
   if(ctx->filter_type == 0 && ctx->fmatching != NULL){
     float* pfdata = (float*)ctx->output.data;
     for (int k = 0; k < ctx->output.height; k++)
@@ -1999,6 +2043,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
     //for DEBUG
     //av_log(0, AV_LOG_INFO, "classification num runcount = %d %d\n",ctx->output.height,ctx->runcount);
   }
+  */
   /*
   char slvpinfo[256] = {0,};
   float* pfdata = ctx->output.data;
@@ -2544,10 +2589,10 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
 		av_frame_free(&context->readframe);
 
   if(context->swscaleframe)
-      av_frame_free(&context->swscaleframe);
+    av_frame_free(&context->swscaleframe);
 
   if(context->swframeforHW)
-      av_frame_free(&context->swframeforHW);
+    av_frame_free(&context->swframeforHW);
 
   if(strlen(context->log_filename) > 0 && context->logfile)
   {
@@ -2562,6 +2607,7 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
     free(context->model_outputname);
   if(context->fmatching)
     free(context->fmatching);
+
   if(context)
     av_free(context);
   context = NULL;
