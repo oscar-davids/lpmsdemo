@@ -88,7 +88,7 @@ func main() {
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
 	flagClass := flag.Int("classid", 0, "class id for classification")
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
-	metaMode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
+	metamode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
 	embededdnn := flag.Int("embededdnn", 0, "if this flag set 1 then run tanscoding and claasify at same C engine")
@@ -104,6 +104,15 @@ func main() {
 		if strings.Index(s, "-embededdnn=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-parallel=") < 0 &&
 			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 && strings.Index(s, "-gpucount=") < 0 {
 			panic("Usage sample: appname -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
+		}
+	}
+	if *metamode > 2 || *metamode < 0 || *embededdnn > 1 || *embededdnn < 0 {
+		panic("check arguments, metamode <= 2 & embededdnn <= 1")
+	}
+	//check parameter
+	if *embededdnn == 1 { //embeded mode classification
+		if *metamode != 2 { //not HLS metadata
+			panic("check metamode argument, metamode be to 2 when -embededdnn=1")
 		}
 	}
 	//check dnnfilter
@@ -153,7 +162,7 @@ func main() {
 			ft.Detector.ClassID = *flagClass
 		}
 		ft.Detector.Interval = float32(*interval)
-		ft.Detector.MetaMode = *metaMode
+		ft.Detector.MetaMode = *metamode
 
 		glog.Infof("Registry DnnEngine: name: %v metadamode: %v", ft.Name, ft.Detector.MetaMode)
 		ffmpeg.RegistryDnnEngine(ft)

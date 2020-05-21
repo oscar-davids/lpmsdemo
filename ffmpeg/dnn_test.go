@@ -50,7 +50,7 @@ func TestDnn_GetVideoInfo(t *testing.T) {
 	fname := "../data/bunny2.mp4"
 
 	tvinfo := NewDnnVinfo()
-	vinfo := tvinfo.GetVideoInfo(fname)
+	vinfo, _ := tvinfo.GetVideoInfo(fname)
 	if len(vinfo) == 0 {
 		t.Errorf("Could not get video information %v", fname)
 	} else {
@@ -212,7 +212,7 @@ func BenchmarkDnnSW_AllDigitalExecutetime(b *testing.B) {
 		dnnfilter.StopDnnFilter()
 
 		tvinfo := NewDnnVinfo()
-		vinfo := tvinfo.GetVideoInfo(fname)
+		vinfo, _ := tvinfo.GetVideoInfo(fname)
 		tvinfo.DeleteDnnVinfo()
 		//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
 		evalreport := fmt.Sprintf("Run %vx = classify(1) and transcoding(%v %v) at video(%v) : %v sec\n", dnncfg.Detector.SampleRate,
@@ -276,7 +276,7 @@ func BenchmarkDnnSW_AllCombineExecutetime(b *testing.B) {
 		RemoveAllDnnEngine()
 
 		tvinfo := NewDnnVinfo()
-		vinfo := tvinfo.GetVideoInfo(fname)
+		vinfo, _ := tvinfo.GetVideoInfo(fname)
 		tvinfo.DeleteDnnVinfo()
 		//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
 		evalreport := fmt.Sprintf("Run %vx = classify(1) and transcoding(%v %v) at video(%v) : %v sec\n", dnncfg.Detector.SampleRate,
@@ -295,6 +295,40 @@ func BenchmarkDnnSW_AllCombineExecutetime(b *testing.B) {
 	}
 
 	fmt.Println(totalreport)
+}
+
+func BenchmarkDnnSW_ClassifyExecutetime(b *testing.B) {
+
+	dnncfg := PDnnDetector
+	dnncfg.Detector.SampleRate = 1
+	dnncfg.Detector.Interval = 0.0
+
+	dnnfilter := NewDnnFilter()
+	dnnfilter.dnncfg = dnncfg
+	if dnnfilter.InitDnnFilter(dnncfg) != true {
+		b.Errorf("Can not load model file %v", dnncfg.Detector.ModelPath)
+	}
+	prof := P720p25fps16x9
+
+	fname := "../data/bunny2.mp4"
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		// dnn filter
+		dnnfilter.ExecuteDnnFilter(fname, Nvidia)
+	}
+	elapsed := time.Since(start)
+	elasec := elapsed.Seconds() / float64(b.N)
+	dnnfilter.StopDnnFilter()
+
+	tvinfo := NewDnnVinfo()
+	vinfo, frames := tvinfo.GetVideoInfo(fname)
+	tvinfo.DeleteDnnVinfo()
+	//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
+	evalreport := fmt.Sprintf("Run %v %v %v %v %v classify: %v sec, %v s(per 1 frame) %v fps\n", dnncfg.Detector.SampleRate,
+		prof.Resolution, prof.Framerate, vinfo, frames, elasec, elasec/float64(frames), float64(frames)/elasec)
+
+	fmt.Println(evalreport)
+
 }
 
 //go test -run DnnHW -bench DnnHW
@@ -433,7 +467,7 @@ func BenchmarkDnnHW_AllDigitalExecutetime(b *testing.B) {
 		dnnfilter.StopDnnFilter()
 
 		tvinfo := NewDnnVinfo()
-		vinfo := tvinfo.GetVideoInfo(fname)
+		vinfo, _ := tvinfo.GetVideoInfo(fname)
 		tvinfo.DeleteDnnVinfo()
 		//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
 		evalreport := fmt.Sprintf("Run %vx = classify(1) and transcoding(%v %v) at video(%v) : %v sec\n", dnncfg.Detector.SampleRate,
@@ -497,7 +531,7 @@ func BenchmarkDnnHW_AllCombineExecutetime(b *testing.B) {
 		RemoveAllDnnEngine()
 
 		tvinfo := NewDnnVinfo()
-		vinfo := tvinfo.GetVideoInfo(fname)
+		vinfo, _ := tvinfo.GetVideoInfo(fname)
 		tvinfo.DeleteDnnVinfo()
 		//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
 		evalreport := fmt.Sprintf("Run %vx = classify(1) and transcoding(%v %v) at video(%v) : %v sec\n", dnncfg.Detector.SampleRate,
@@ -516,4 +550,37 @@ func BenchmarkDnnHW_AllCombineExecutetime(b *testing.B) {
 	}
 
 	fmt.Println(totalreport)
+}
+func BenchmarkDnnHW_ClassifyExecutetime(b *testing.B) {
+
+	dnncfg := PDnnDetector
+	dnncfg.Detector.SampleRate = 1
+	dnncfg.Detector.Interval = 0.0
+
+	dnnfilter := NewDnnFilter()
+	dnnfilter.dnncfg = dnncfg
+	if dnnfilter.InitDnnFilter(dnncfg) != true {
+		b.Errorf("Can not load model file %v", dnncfg.Detector.ModelPath)
+	}
+	prof := P720p25fps16x9
+
+	fname := "../data/bunny2.mp4"
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		// dnn filter
+		dnnfilter.ExecuteDnnFilter(fname, Nvidia)
+	}
+	elapsed := time.Since(start)
+	elasec := elapsed.Seconds() / float64(b.N)
+	dnnfilter.StopDnnFilter()
+
+	tvinfo := NewDnnVinfo()
+	vinfo, frames := tvinfo.GetVideoInfo(fname)
+	tvinfo.DeleteDnnVinfo()
+	//run 1x = classify(1) and transcoding(1280x720 30fps) at realtime video len(s): xxxx s
+	evalreport := fmt.Sprintf("Run %v %v %v %v %v classify: %v sec, %v s(per 1 frame) %v fps\n", dnncfg.Detector.SampleRate,
+		prof.Resolution, prof.Framerate, vinfo, frames, elasec, elasec/float64(frames), float64(frames)/elasec)
+
+	fmt.Println(evalreport)
+
 }

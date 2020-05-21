@@ -1340,7 +1340,10 @@ int transcode(struct transcode_thread *h,
   int nsamplerate = 0;
   int flagHW = AV_HWDEVICE_TYPE_CUDA == ictx->hw_type;
   if(inp->ftimeinterval > 0.0) nsamplerate = (int)(25.0 * inp->ftimeinterval);
-  else  nsamplerate = Filters->data->sample_rate;  
+  else {
+    if(Filters != NULL)
+      nsamplerate = Filters->data->sample_rate;    
+  }
   initcontextlist();
   //av_log(0, AV_LOG_ERROR, "nsamplerate = %d \n",nsamplerate);
 

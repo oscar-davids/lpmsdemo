@@ -488,7 +488,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 			}
 		}
 		// preserve aspect ratio along the larger dimension when rescaling
-		var filters string
+		var filters string = ""
 		if param.Framerate > 0 {
 			filters = fmt.Sprintf("fps=%d/1,", param.Framerate)
 		}
@@ -669,14 +669,14 @@ func NewDnnVinfo() *VideoInfo {
 		init:  false,
 	}
 }
-func (t *VideoInfo) GetVideoInfo(infname string) string {
+func (t *VideoInfo) GetVideoInfo(infname string) (string, int) {
 	fname := C.CString(infname)
 	defer C.free(unsafe.Pointer(fname))
 	C.lpms_getvideoinfo(fname, t.Vinfo)
 
 	srtret := fmt.Sprintf("%vX%v @ %vfps %v sec", int(t.Vinfo.width), int(t.Vinfo.height), float32(t.Vinfo.fps), float32(t.Vinfo.duration))
 
-	return srtret
+	return srtret, int(t.Vinfo.framecount)
 }
 func (t *VideoInfo) DeleteDnnVinfo() {
 	C.free(unsafe.Pointer(t.Vinfo))
