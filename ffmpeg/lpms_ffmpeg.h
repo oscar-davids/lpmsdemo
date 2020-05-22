@@ -161,6 +161,32 @@ typedef struct DnnFilterNode {
   struct DnnFilterNode *next;
 } DnnFilterNode;
 
+
+typedef struct box {
+	float x, y, w, h;
+} box;
+
+typedef struct sortable_bbox {
+	int index;
+	int class_id;
+	float **probs;
+} sortable_bbox;
+
+typedef struct boxobject {
+	int left, top, right, bot;
+	float prob;
+	int class_id;
+} boxobject;
+
+typedef struct layer {
+	int side;
+	int n;
+	int cols;
+	int sqrt;
+	int classes;
+} layer;
+
+
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 void  	lpms_dnnfree();
 int  	lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass,float  tinteval, float* porob);
