@@ -92,8 +92,8 @@ struct transcode_thread {
   int nb_outputs;
 
 };
-//yolo
 
+//some algorithm for yolo 
 int max_index(float *a, int n)
 {
 	if (n <= 0) return -1;
@@ -145,6 +145,38 @@ float box_iou(box a, box b)
 	}
 	return I / U;
 }
+float _iou(box box1, box box2)
+{
+#ifndef ioumax
+#define ioumax(a,b) a>b?a:b
+#endif
+#ifndef ioumin
+#define ioumin(a,b) a<b?a:b
+#endif
+	//Computes Intersection over Union value for 2 bounding boxes
+	//param box1 : array of 4 values(top left and bottom right coords) : [x0, y0, x1, y1]
+	//param box2 : same as box1
+
+	//float box1.x, box1.y, box1.w, box1.h = box1;
+	//float box2.x, box2.y, box2.w, box2.h = box2;
+
+	float int_x0 = ioumax(box1.x, box2.x);
+	float int_y0 = ioumax(box1.y, box2.y);
+	float int_x1 = ioumin(box1.w, box2.w);
+	float int_y1 = ioumin(box1.h, box2.h);
+
+	float int_w = ioumax(int_x1 - int_x0, 0.0);
+	float int_h = ioumax(int_y1 - int_y0, 0.0);
+
+	float int_area = int_w * int_h;
+
+	float b1_area = (box1.w - box1.x) * (box1.h - box1.y);
+	float b2_area = (box2.w - box2.x) * (box2.h - box2.y);
+
+	//# we add small epsilon of 1e-05 to avoid division by 0
+	float iou = int_area / (b1_area + b2_area - int_area + 1e-05);
+	return iou;
+}
 void do_nms(box *boxes, float **probs, int total, int classes, float thresh)
 {
 	int i, j, k;
@@ -155,14 +187,57 @@ void do_nms(box *boxes, float **probs, int total, int classes, float thresh)
 			continue;
 		}
 		for (j = i + 1; j < total; ++j) {
-			if (box_iou(boxes[i], boxes[j]) > thresh) {
-				for (k = 0; k < classes; ++k) {
-					if (probs[i][k] < probs[j][k]) probs[i][k] = 0;
-					else probs[j][k] = 0;
+			if (boxes[j].w > 0.0 && boxes[j].h > 0.0) {
+				if (_iou(boxes[i], boxes[j]) > thresh) {
+					for (k = 0; k < classes; ++k) {
+						if (probs[i][k] < probs[j][k]) probs[i][k] = 0;
+						else probs[j][k] = 0;
+					}
 				}
-			}
+			}			
 		}
 	}
+}
+
+void get_detection_boxes(float* pdata, layer l, int w, int h, float thresh, float **probs, box *boxes, int only_objectness)
+{
+	int i, j, n;
+	float *predictions = pdata;
+	int ntest1 = 0;
+	int ntest2 = 0;
+	//int per_cell = 5*num+classes;
+
+	for (n = 0; n < l.n; ++n) {
+		int index = n;
+		//int p_index = l.side*l.side*l.classes + i * l.n + n;
+		int p_index = n * l.cols + 4;
+		float scale = predictions[p_index];
+		if (scale > thresh) {
+			ntest1++;
+			
+			int box_index = n * l.cols;
+			boxes[index].x = (predictions[box_index + 0]);
+			boxes[index].y = (predictions[box_index + 1]);			
+			boxes[index].w = predictions[box_index + 2];
+			boxes[index].h = predictions[box_index + 3];
+			for (j = 0; j < l.classes; ++j) {
+				int class_index = box_index + 5;
+				//float prob = scale * predictions[class_index + j];
+				float prob = predictions[class_index + j];
+				if (prob > thresh) {
+					probs[index][j] = prob;
+					ntest2++;
+				}
+				else {
+					probs[index][j] = 0.0;
+				}
+				//probs[index][j] = (prob > thresh) ? prob : 0;
+			}
+			if (only_objectness) {
+				probs[index][0] = scale;
+			}
+		}
+	}	
 }
 //merge transcoding and classify for multi model
 DnnFilterNode* Filters = NULL;
