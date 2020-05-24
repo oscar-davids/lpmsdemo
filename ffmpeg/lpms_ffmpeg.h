@@ -7,6 +7,9 @@
 #ifndef MAXPATH
 #define MAXPATH 256
 #endif
+#ifndef MAX_YOLO_FRAME
+#define MAX_YOLO_FRAME 512
+#endif
 
 // LPMS specific errors
 extern const int lpms_ERR_INPUT_PIXFMT;
@@ -75,6 +78,7 @@ void lpms_transcode_stop(struct transcode_thread* handle);
 typedef enum {DNN_FLOAT = 1, DNN_UINT8 = 4} DNNDataType;
 typedef enum {DNN_NATIVE, DNN_TF} DNNBackendType;
 typedef enum {DNN_SUCCESS, DNN_ERROR} DNNReturnType;
+typedef enum {DNN_CLASSIFY, DNN_YOLO, DNN_FILTERMAX } DNNFilterType;
 
 typedef struct Vinfo{
     float fps;
@@ -82,6 +86,32 @@ typedef struct Vinfo{
     int framecount;
     float duration;
 } Vinfo;
+
+typedef struct box {
+	float x, y, w, h;
+} box;
+
+typedef struct sortable_bbox {
+	int index;
+	int class_id;
+	float **probs;
+} sortable_bbox;
+
+typedef struct boxobject {
+	int left, top, right, bot;
+	float prob;
+	int class_id;
+    int frameid;
+} boxobject;
+
+typedef struct layer {
+	int side;
+	int n;
+	int cols;
+	int sqrt;
+	int classes;
+} layer;
+
 
 typedef struct DNNData{
     void *data;
@@ -113,8 +143,8 @@ typedef struct DNNModule{
 
 typedef struct LVPDnnContext {    
 
-    DNNBackendType backend_type;  //default tensorflow
-    int     filter_type;          //classification, rect detection ...
+    DNNBackendType backend_type;    //default tensorflow
+    DNNFilterType  filter_type;     //DNN_CLASSIFY:classification, DNN_YOLO:yolo detection ...
     char    *model_filename;    
     char    *model_inputname;
     char    *model_outputname;
@@ -147,9 +177,16 @@ typedef struct LVPDnnContext {
 	enum AVHWDeviceType type;
 	AVBufferRef 		*hw_device_ctx;
 	enum AVPixelFormat 	hw_pix_fmt;	
-	//for inference probability
-    float               *fmatching;
     int                 runcount;
+	//for inference probability for classification
+    float               *fmatching;    
+    //for yolo object  detection
+    box                 *boxes;
+	float               **probs;
+	boxobject           *object;
+    int                 classes;
+    char                **result;
+    int                 resultmax;
 	// for log file
     FILE                *logfile;
     int                 framenum;
@@ -162,30 +199,6 @@ typedef struct DnnFilterNode {
 } DnnFilterNode;
 
 
-typedef struct box {
-	float x, y, w, h;
-} box;
-
-typedef struct sortable_bbox {
-	int index;
-	int class_id;
-	float **probs;
-} sortable_bbox;
-
-typedef struct boxobject {
-	int left, top, right, bot;
-	float prob;
-	int class_id;
-} boxobject;
-
-typedef struct layer {
-	int side;
-	int n;
-	int cols;
-	int sqrt;
-	int classes;
-} layer;
-
 
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
 void  	lpms_dnnfree();
@@ -197,6 +210,7 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
 int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, float tinteval, int* classid, float* porob);
 void lpms_dnnstop(LVPDnnContext* context);
 
+void lpms_setfiltertype(LVPDnnContext* context, int ntype);
 void lpms_dnnCappend(LVPDnnContext* context);
 void lpms_dnnCdelete(LVPDnnContext* context);
 

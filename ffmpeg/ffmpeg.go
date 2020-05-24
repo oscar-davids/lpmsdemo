@@ -729,6 +729,8 @@ func (t *DnnFilter) InitDnnFilter(dnncfg VideoProfile) bool {
 
 	gpuid := int(dnncfg.Detector.Gpuid)
 
+	C.lpms_setfiltertype(t.handle, C.int(dnncfg.Detector.Dnntype))
+
 	res := C.lpms_dnninitwithctx(t.handle, model, Input, Output, C.int(nsample), C.float(threshold), C.int(gpuid))
 	if res == 0 {
 		t.initdnn = true

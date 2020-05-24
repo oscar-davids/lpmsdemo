@@ -199,21 +199,19 @@ void do_nms(box *boxes, float **probs, int total, int classes, float thresh)
 	}
 }
 
-void get_detection_boxes(float* pdata, layer l, int w, int h, float thresh, float **probs, box *boxes, int only_objectness)
+int  get_detection_boxes(float* pdata, layer l, int w, int h, float thresh, float **probs, box *boxes, int only_objectness)
 {
 	int i, j, n;
 	float *predictions = pdata;
-	int ntest1 = 0;
-	int ntest2 = 0;
+	int nboxcount = 0;	
 	//int per_cell = 5*num+classes;
-
 	for (n = 0; n < l.n; ++n) {
 		int index = n;
 		//int p_index = l.side*l.side*l.classes + i * l.n + n;
 		int p_index = n * l.cols + 4;
 		float scale = predictions[p_index];
 		if (scale > thresh) {
-			ntest1++;
+			nboxcount++;
 			
 			int box_index = n * l.cols;
 			boxes[index].x = (predictions[box_index + 0]);
@@ -225,8 +223,7 @@ void get_detection_boxes(float* pdata, layer l, int w, int h, float thresh, floa
 				//float prob = scale * predictions[class_index + j];
 				float prob = predictions[class_index + j];
 				if (prob > thresh) {
-					probs[index][j] = prob;
-					ntest2++;
+					probs[index][j] = prob;					
 				}
 				else {
 					probs[index][j] = 0.0;
@@ -237,7 +234,47 @@ void get_detection_boxes(float* pdata, layer l, int w, int h, float thresh, floa
 				probs[index][0] = scale;
 			}
 		}
-	}	
+	}
+  return nboxcount;	
+}
+void get_detections(LVPDnnContext *ctx, int nw, int nh, float fx, float fy, int num, float thresh, box *boxes, 
+float **probs, int classes, boxobject *objects, int* count)
+{
+	int i;
+	*count = 0;
+	int ncount = 0;
+  char strtemp[MAXPATH] = {0,};
+  if(ctx->result == NULL || ctx->resultmax >= MAX_YOLO_FRAME) return;
+  sprintf(ctx->result[ctx->resultmax],"{time:%d,",ctx->resultmax);
+
+	for (i = 0; i < num; ++i) {
+		int class_id = max_index(probs[i], classes);
+		float prob = probs[i][class_id];
+		if (prob > thresh) {
+			
+			box b = boxes[i];
+
+			objects[ncount].left = b.x * fx;
+			objects[ncount].right = b.w * fx;
+			objects[ncount].top = b.y * fy;
+			objects[ncount].bot = b.h * fy;
+
+			if (objects[ncount].left < 0) objects[ncount].left = 0;
+			if (objects[ncount].right > nw - 1) objects[ncount].right = nw - 1;
+			if (objects[ncount].top < 0) objects[ncount].top = 0;
+			if (objects[ncount].bot > nh - 1)objects[ncount].bot = nh - 1;
+			objects[ncount].prob = prob;
+			objects[ncount].class_id = class_id;
+      sprintf(strtemp,"%d %.02f %d %d %d %d,", class_id, prob ,objects[ncount].left, objects[ncount].top, objects[ncount].right, objects[ncount].bot);
+      strcat(ctx->result[ctx->resultmax], strtemp);
+			ncount++;
+		}
+	}
+	*count = ncount;
+  if(ncount > 0) {
+    strcat(ctx->result[ctx->resultmax], "}");  
+    ctx->resultmax++;
+  }
 }
 //merge transcoding and classify for multi model
 DnnFilterNode* Filters = NULL;
@@ -246,6 +283,11 @@ int DnnFilterNum = 0;
 static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in);
 static int  prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW);
 
+void lpms_setfiltertype(LVPDnnContext* context, int ntype)
+{
+  if(context == NULL || ntype < 0 || ntype >= (int)DNN_FILTERMAX ) return;
+  context->filter_type = (DNNFilterType)ntype;
+}
 void lpms_dnnCappend(LVPDnnContext* lvpdnn)
 {
   DnnFilterNode *t, *temp;
@@ -321,11 +363,27 @@ void initcontextlist() {
     return;
   }
   while (t != NULL) {
+    if(t->data->filter_type == DNN_CLASSIFY)
+    {
       if(t->data->fmatching && t->data->output.height > 0){
         memset(t->data->fmatching, 0x00, sizeof(float)*t->data->output.height);
       }
-      t->data->runcount = 0;
-      t = t->next;
+    } 
+    else if(t->data->filter_type == DNN_YOLO)
+    {
+      memset(t->data->boxes, 0x00, t->data->output.height*sizeof(box));	    
+	    for (int j = 0; j < t->data->output.height; ++j) 
+        memset(t->data->probs[j], 0x00, t->data->classes * sizeof(float));
+
+      memset(t->data->object, 0x00, t->data->output.height*sizeof(boxobject));
+      //for result      
+	    for (int j = 0; j < MAX_YOLO_FRAME; ++j) 
+        memset(t->data->result[j], 0x00, MAXPATH);   
+    }    
+      
+    t->data->runcount = 0;
+    t->data->resultmax = 0;
+    t = t->next;
   }  
 }
 void cleancontextlist() {
@@ -373,6 +431,7 @@ void cleancontextlist() {
           }
           
           context->runcount = 0;
+          context->resultmax = 0;
       }
       
       t = t->next;
@@ -411,26 +470,40 @@ void getclassifyresult(int runcount, char* strbuffer) {
   
   while (t != NULL) {
     //get confidence order 
-    float prob = 0.0;
-    int classid = -1; 
-    float* confidences = (float*)t->data->fmatching;
-    for (int i = 0; i < t->data->output.height; i++)
+    if(t->data->filter_type == DNN_CLASSIFY)
     {
-        if(confidences[i] > prob) {
-          prob = confidences[i];
-          classid = i;
-        }
-    }  
+      float prob = 0.0;
+      int classid = -1; 
+      float* confidences = (float*)t->data->fmatching;
+      //find max prob classid
+      for (int i = 0; i < t->data->output.height; i++)
+      {
+          if(confidences[i] > prob) {
+            prob = confidences[i];
+            classid = i;
+          }
+      }  
 
-    if(runcount > 1) {
-      prob = prob / (float)runcount;
-    }
-    if(prob >= t->data->valid_threshold)
-    {
-      sprintf(stemp,"%d:%d:%f,", dnnid, classid, prob);
-      //strcat
-      strcat(strbuffer, stemp);
-      av_log(0, AV_LOG_ERROR, "Engine Dnnid Classid & Probability = %d %d %f\n", dnnid, classid, prob);
+      if(runcount > 1) {
+        prob = prob / (float)runcount;
+      }
+      if(prob >= t->data->valid_threshold)
+      {
+        sprintf(stemp,"%d:%d:%f,", dnnid, classid, prob);
+        //strcat
+        strcat(strbuffer, stemp);
+        av_log(0, AV_LOG_ERROR, "Engine Dnnid Classid & Probability = %d %d %f\n", dnnid, classid, prob);
+      }
+    } else if(t->data->filter_type == DNN_YOLO) {
+      if(t->data->resultmax > 0) {
+        //now we print firstframe and last frame object
+        sprintf(strbuffer,"%s", t->data->result[0]);
+        if(t->data->resultmax > 1 && strlen(strbuffer) < MAXPATH / 2) {
+          strcat(strbuffer, t->data->result[t->data->resultmax-1]);
+        }
+        av_log(0, AV_LOG_ERROR, "%s\n", strbuffer);
+      }
+
     }
     t = t->next;
     dnnid++;
@@ -2113,9 +2186,26 @@ static int copy_from_frame_to_dnn(LVPDnnContext *ctx, const AVFrame *frame)
 
 
     if (dnn_input->dt == DNN_FLOAT) {
+        
         sws_scale(ctx->sws_gray8_to_grayf32, (const uint8_t **)ctx->swscaleframe->data, ctx->swscaleframe->linesize,
                     0, ctx->swscaleframe->height, (uint8_t * const*)(&dnn_input->data),
                     (const int [4]){ctx->swscaleframe->width * 3 * sizeof(float), 0, 0, 0});
+
+        if(ctx->filter_type == DNN_YOLO) 
+        {
+          for (int i = 0; i < ctx->swscaleframe->height; i++)
+          {
+            float* pfrgb = ((float*)dnn_input->data) + ctx->swscaleframe->width * 3 * i;
+            //uint8_t* pirgb = ctx->swscaleframe->data[i];
+
+            for (int j = 0; j < ctx->swscaleframe->width * 3; j++)
+            {
+              *pfrgb = (float)(*pfrgb) * 255.0; pfrgb++;
+               //pirgb++;
+            }            
+          }
+        }
+
     } else {
         //av_assert0(dnn_input->dt == DNN_UINT8);
         av_image_copy_plane(dnn_input->data, bytewidth,
@@ -2193,16 +2283,39 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       av_log(NULL, AV_LOG_ERROR, "failed to execute model\n");
       return AVERROR(EIO);
   }
-
-  if(ctx->filter_type == 0 && ctx->fmatching != NULL){
-    float* pfdata = (float*)ctx->output.data;
-    for (int k = 0; k < ctx->output.height; k++)
-    {
-      ctx->fmatching[k] += pfdata[k];
+ switch (ctx->filter_type)
+  {
+  case DNN_CLASSIFY:
+    if (ctx->fmatching != NULL) {
+      float* pfdata = (float*)ctx->output.data;
+      for (int k = 0; k < ctx->output.height; k++)
+      {
+        ctx->fmatching[k] += pfdata[k];
+      }
+      ctx->runcount ++;
+      //for DEBUG
+      //av_log(0, AV_LOG_INFO, "classification num runcount = %d %d\n",ctx->output.height,ctx->runcount);
     }
-    ctx->runcount ++;
-    //for DEBUG
-    //av_log(0, AV_LOG_INFO, "classification num runcount = %d %d\n",ctx->output.height,ctx->runcount);
+    break;
+  case DNN_YOLO:    
+    if(ctx->boxes != NULL && ctx->probs != NULL ){
+      //av_log(0, AV_LOG_ERROR, "yolo detect = %d %d\n",ctx->output.height,ctx->classes);
+      int objecount = 0;
+      float xscale = in->width / (float)ctx->input.width;
+      float yscale = in->height / (float)ctx->input.height;
+      layer ldata = { 1, ctx->output.height, ctx->output.width, 0, ctx->classes };
+      float* pfdata = (float*)ctx->output.data;
+
+      if (get_detection_boxes(pfdata, ldata, 1, 1, 0.5, ctx->probs, ctx->boxes, 0) > 0){
+        do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);	
+        get_detections(ctx, in->width, in->height, xscale, yscale, ldata.n, 0.5, ctx->boxes, 
+        ctx->probs, ldata.classes, ctx->object, &objecount);
+      }
+      ctx->runcount ++;      
+    }
+    break;
+  default:
+    break;
   }
 
   /*
@@ -2719,14 +2832,33 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
       return AVERROR(EIO);
   }
 
-  if(ctx->filter_type == 0){    
+  switch (ctx->filter_type)
+  {
+  case DNN_CLASSIFY:
     ctx->fmatching = (float*)malloc((ctx->output.height + 1) * sizeof(float));
     if(ctx->fmatching == NULL){
         av_log(NULL, AV_LOG_ERROR, "can not creat matching buffer\n");
         return AVERROR(EIO);
     }
     memset(ctx->fmatching, 0x00, (ctx->output.height + 1) * sizeof(float));
-    //av_log(NULL, AV_LOG_ERROR, "ctx->fmatching create success\n");
+    break;
+
+  case DNN_YOLO:
+      av_log(NULL, AV_LOG_ERROR, "yolo information %d %d %d\n",
+      ctx->output.width,ctx->output.height,ctx->output.channels);      
+      ctx->classes = ctx->output.width - 5;
+      ctx->boxes = (box*)calloc(ctx->output.height, sizeof(box));
+	    ctx->probs = (float**)calloc(ctx->output.height, sizeof(float*));
+	    for (int j = 0; j < ctx->output.height; ++j) ctx->probs[j] = (float*)calloc(ctx->classes, sizeof(float));
+	    ctx->object = (boxobject*)calloc(ctx->output.height, sizeof(boxobject));
+      //for result
+      ctx->result = (char**)calloc(MAX_YOLO_FRAME, sizeof(char*));
+	    for (int j = 0; j < MAX_YOLO_FRAME; ++j) ctx->result[j] = (char*)calloc(MAXPATH, sizeof(char));
+      
+    break;
+
+  default:
+    break;
   }
   
   //av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
@@ -2774,9 +2906,42 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
     free(context->model_outputname);
     context->model_outputname = NULL;
   }
-  if(context->fmatching){
-    free(context->fmatching);
-    context->fmatching = NULL;
+  switch (context->filter_type)
+  {
+  case DNN_CLASSIFY:
+    if(context->fmatching){
+      free(context->fmatching);
+      context->fmatching = NULL;
+    }
+    break;
+  case DNN_YOLO:      
+    if(context->boxes){
+      free(context->boxes);
+      context->boxes = NULL;
+    }
+    if(context->object){
+      free(context->object);
+      context->object = NULL;
+    }
+    for (int j = 0; j < context->output.height; ++j) {
+      if(context->probs[j]) free(context->probs[j]);        
+    }
+    if(context->probs){
+      free(context->probs);
+      context->probs = NULL;
+    }
+    //for result
+    for (int j = 0; j < MAX_YOLO_FRAME; ++j) {
+      if(context->result[j]) free(context->result[j]);        
+    }
+    if(context->result){
+      free(context->result);
+      context->result = NULL;
+    }
+    break;
+
+  default:
+    break;
   }
 
   if(context)
@@ -2876,11 +3041,11 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
   if(nsamplerate == 0 || classnum == 0)
     goto cleancontext;
 
+  memset(context->fmatching, 0x00, classnum * sizeof(float));
+  context->runcount = 0;
+
 	context->readframe = av_frame_alloc();
-
-  confidences = malloc(sizeof(float)*classnum);
-  memset(confidences,0x00,sizeof(float)*classnum);
-
+  
   while (ret >= 0) {
 
 		if ((ret = av_read_frame(context->input_ctx, &packet)) < 0)
@@ -2903,23 +3068,31 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
         context->framenum ++;
         if(context->framenum % nsamplerate == 0){
           dnnresult = lpms_detectoneframewithctx(context,context->readframe);
-          if(dnnresult == DNN_SUCCESS){
-            count++;            
-            float* pfdata = (float*)context->output.data;            
-            for (int k = 0; k < classnum; k++)
-            {
-              confidences[k] += pfdata[k];
-            }
-            
-          }
+          count++;        
         }
 			  av_frame_unref(context->readframe);
 	    }
 		
 	    av_packet_unref(&packet);
 	}
+  if(context->filter_type == DNN_CLASSIFY){
+    confidences = (float*)context->fmatching;
+    //find max prob classid  
+    for (int i = 0; i < context->output.height; i++)
+    {
+        if(confidences[i] > *porob) {
+          *porob = confidences[i];
+          *classid = i;
+        }
+    }
+    if(context->runcount > 1) {
+      *porob = *porob / (float)context->runcount;
+    }
 
-   //get confidence order  
+    av_log(0, AV_LOG_ERROR, "Engine Classid & Probability = %d %f\n",*classid, *porob);
+  }
+  /*
+  //get confidence order  
   for (int i = 0; i < classnum; i++)
   {
       if(confidences[i] > *porob) {
@@ -2927,13 +3100,7 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
         *classid = i;
       }
   }  
-
-  if(count > 1) {
-  	*porob = *porob / (float)count;
-  } 
-
-  av_log(0, AV_LOG_ERROR, "Engine Classid & Probability = %d %f\n",*classid, *porob);
-  
+  */ 
  cleancontext: 
   if(confidences)
     free(confidences);
@@ -2960,7 +3127,7 @@ int  lpms_dnnexecutewithctx(LVPDnnContext *context, char* ivpath, int flagHW, fl
 LVPDnnContext*  lpms_dnnnew()
 {
   LVPDnnContext *ctx = (LVPDnnContext*)av_mallocz(sizeof(LVPDnnContext));
-  if(ctx) ctx->filter_type = 0;
+  if(ctx) ctx->filter_type = DNN_CLASSIFY;
   return ctx;
 }
 void lpms_dnnstop(LVPDnnContext* context)
