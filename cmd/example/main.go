@@ -95,7 +95,7 @@ func main() {
 
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
-		panic("Usage sample: appname -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
+		panic("Usage sample: -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
 	}
 	for i, s := range os.Args {
 		if i == 0 {
@@ -103,7 +103,7 @@ func main() {
 		}
 		if strings.Index(s, "-embededdnn=") < 0 && strings.Index(s, "-interval=") < 0 && strings.Index(s, "-parallel=") < 0 &&
 			strings.Index(s, "-dnnfilter=") < 0 && strings.Index(s, "-metamode=") < 0 && strings.Index(s, "-gpucount=") < 0 {
-			panic("Usage sample: appname -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
+			panic("Usage sample: -interval=1.5 -dnnfilter=PDnnDetector -metamode=0 -gpucount=2 -parallel=2 -embededdnn=1")
 		}
 	}
 	if *metamode > 2 || *metamode < 0 || *embededdnn > 1 || *embededdnn < 0 {
@@ -363,17 +363,16 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 					PgDataEnd = true
 					FgContents = stream.ContentsEnd
 				}
-
-				if len(contents) > 0 {
+				isYolo := ffmpeg.GetYoloDetectorID()
+				if len(contents) > 0 && isYolo < 0 {
 					glog.Infof("Get Dnn filtering contents at pid %v :%v\n", pid, contents)
-
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff,
-						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
+						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				} else {
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i],
-						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents}); err != nil {
+						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				}

@@ -7,6 +7,10 @@
 #ifndef MAXPATH
 #define MAXPATH 256
 #endif
+#ifndef YOLOMAXPATH
+#define YOLOMAXPATH 4096
+#endif
+
 #ifndef MAX_YOLO_FRAME
 #define MAX_YOLO_FRAME 512
 #endif
@@ -56,7 +60,7 @@ typedef struct {
 typedef struct {
     int     frames;
     int64_t pixels;
-    char    desc[MAXPATH];
+    char    *desc;
 } output_results;
 
 
@@ -65,6 +69,10 @@ int  lpms_rtmp2hls(char *listen, char *outf, char *ts_tmpl, char *seg_time, char
 int  lpms_transcode(input_params *inp, output_params *params, output_results *results, int nb_outputs, output_results *decoded_results);
 struct transcode_thread* lpms_transcode_new();
 void lpms_transcode_stop(struct transcode_thread* handle);
+
+// initializer of output_results
+output_results * output_results_init(int isYolo);
+void output_results_destroy(output_results* output_results);
 
 #define _ADD_LPMS_DNN_
 #ifdef _ADD_LPMS_DNN_
