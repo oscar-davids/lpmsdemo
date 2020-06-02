@@ -513,6 +513,28 @@ void getclassifyresult(int runcount, char* strbuffer) {
 // Transcoder
 //
 
+output_results * output_results_init(int isYolo)
+{
+  output_results *result = (output_results*)malloc(sizeof(output_results));
+  memset(result, 0x00, sizeof(output_results));
+  
+  if (isYolo){
+    result->desc = (char*)malloc(YOLOMAXPATH * sizeof(char));
+    memset(result->desc, 0x00, YOLOMAXPATH * sizeof(char)); 
+  } else {
+    result->desc = (char*)malloc(MAXPATH * sizeof(char)); 
+    memset(result->desc, 0x00, MAXPATH * sizeof(char)); 
+  }
+  return result;
+}
+void output_results_destroy(output_results* output_results)
+{
+  if(output_results == NULL) return;
+  if(output_results->desc!= NULL)
+      free(output_results->desc);
+  free(output_results);
+}
+
 static void free_filter(struct filter_ctx *filter)
 {
   if (filter->frame) av_frame_free(&filter->frame);
@@ -1789,7 +1811,6 @@ int lpms_transcode(input_params *inp, output_params *params,
 
   ret = transcode(h, inp, params, results, decoded_results);
   h->initialized = 1;
-
   return ret;
 }
 

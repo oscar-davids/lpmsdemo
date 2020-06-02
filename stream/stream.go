@@ -78,15 +78,14 @@ func (b *streamBuffer) len() int64 {
 
 //We couldn't just use the m3u8 definition
 type HLSSegment struct {
-	SeqNo    uint64
-	Name     string
-	Data     []byte
-	Duration float64
+	SeqNo      uint64
+	Name       string
+	Data       []byte
+	Duration   float64
 	PgDataTime bool
-	PgDataEnd bool
+	PgDataEnd  bool
 	FgContents int //0:Contents None, 1:ContentsStart, 2:ContentsContinue, 3:ContentsEnd
-	
-	
+	ObjectData string
 }
 
 //Compare playlists by segments

@@ -428,8 +428,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	defer C.free(unsafe.Pointer(fname))
 	//var detecttemp string
 	//var samplerate uint
-
-	//scane dnn dector
+	//scan dnn dector
 	ps := []TranscodeOptions{}
 	pdnn := TranscodeOptions{}
 
@@ -575,8 +574,13 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	inp := &C.input_params{fname: fname, hw_type: hw_type, device: device, metadata: smetadata,
 		handle: t.handle, ftimeinterval: C.float(ftimeinterval)}
 
+	isyolo := 0
+	if GetYoloDetectorID() >= 0 {
+		isyolo = 1
+	}
 	results := make([]C.output_results, len(ps))
-	decoded := &C.output_results{}
+	decoded := C.output_results_init(C.int(isyolo))
+	defer C.output_results_destroy(decoded)
 	var (
 		paramsPointer  *C.output_params
 		resultsPointer *C.output_results
@@ -611,18 +615,31 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence}, nil
 		}
 	} else {
-		tempdata := C.GoString((*C.char)(unsafe.Pointer(&decoded.desc)))
+		tempdata := C.GoString((*C.char)(unsafe.Pointer(decoded.desc)))
 		srtmetadata = ""
 		if len(tempdata) > 0 {
-			token := strings.Split(tempdata, ",")
-			for _, sval := range token {
-				strval := strings.Split(sval, ":")
-				if len(strval) == 3 {
-					dnnid, err1 := strconv.Atoi(strval[0])
-					classid, err2 := strconv.Atoi(strval[1])
-					fprob, err3 := strconv.ParseFloat(strval[2], 32)
-					if err1 == nil && err2 == nil && err3 == nil {
-						srtmetadata += t.GetContentString(dnnid, classid, float32(fprob))
+			if isyolo > 0 {
+				replaceddata := ""
+				for i := 0; i < len(PDnnYoloFilter.Detector.ClassName[i]); i++ {
+					orig := "," + strconv.Itoa(i)
+					new := "," + PDnnYoloFilter.Detector.ClassName[i]
+					replaceddata = strings.Replace(tempdata, orig, new, -1)
+					tempdata = replaceddata
+				}
+				srtmetadata += replaceddata
+				fconfidence = 0
+			} else { //classification
+				token := strings.Split(tempdata, ",")
+				for _, sval := range token {
+					strval := strings.Split(sval, ":")
+					if len(strval) == 3 {
+						dnnid, err1 := strconv.Atoi(strval[0])
+						classid, err2 := strconv.Atoi(strval[1])
+						fprob, err3 := strconv.ParseFloat(strval[2], 32)
+
+						if err1 == nil && err2 == nil && err3 == nil {
+							srtmetadata += t.GetContentString(dnnid, classid, float32(fprob))
+						}
 					}
 				}
 			}
@@ -848,6 +865,25 @@ func (t *DnnSet) ReleaseSetDnnFilter() {
 //var gpuparallel int = 1
 func SetCengineFlag(flag bool) {
 	usednnCengine = flag
+}
+func GetYoloDetectorID() int {
+	pid := -1
+	if gpuparallel > 0 {
+		for i, dnnf := range dnnsets[0].filters {
+			if dnnf.dnncfg.Detector.Dnntype == DnnYolo {
+				pid = i
+				break
+			}
+		}
+	} else if len(dnnfilters) > 0 {
+		for i, dnnf := range dnnfilters {
+			if dnnf.dnncfg.Detector.Dnntype == DnnYolo {
+				pid = i
+				break
+			}
+		}
+	}
+	return pid
 }
 
 func SetAvailableGpuNum(ngpu int) int {

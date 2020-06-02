@@ -89,8 +89,8 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	now := time.Now()
 	//if seg.PgDataEnd == true {
 	//	//s.plCache.SetDiscontinuity()
-	//	s.plCache.SetProgramDateTime(now)		
-	//}	
+	//	s.plCache.SetProgramDateTime(now)
+	//}
 	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd {
 		s.plCache.SetProgramDateTime(now)
 	}
@@ -98,7 +98,7 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	SCTE35Commandtag := ""
 	SCTE35Outtag := ""
 	switch seg.FgContents {
-	case ContentsStart:	
+	case ContentsStart:
 		SCTE35Outtag = "test"
 	case ContentsContinue:
 		SCTE35Commandtag = "test"
@@ -109,21 +109,22 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 
 	nanosec := int64(seg.Duration * 1000000000.0)
 	nowplus := now.Add(time.Duration(nanosec))
-	nowplusend := now.Add(time.Duration(nanosec+nanosec))
-	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd {
+	nowplusend := now.Add(time.Duration(nanosec + nanosec))
+	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || seg.FgContents == ContentsContinue {
 		DateRange := &m3u8.DateRange{
 			ID:               "2020",
 			StartDate:        nowplus,
-			Duration:         seg.Duration*2,
+			Duration:         seg.Duration * 2,
 			PlannedDuration:  seg.Duration,
 			Class:            "class",
 			EndDate:          nowplusend,
-			ClientAttributes: m3u8.ClientAttributes{"X-AD-URL": "http://ad.com/acme"},
+			ClientAttributes: m3u8.ClientAttributes{"X-AD-URL": "http://ad.com/acme", "detectobjects": seg.ObjectData},
 			SCTE35In:         SCTE35Intag,
 			SCTE35Out:        SCTE35Outtag,
-			SCTE35Command:    SCTE35Commandtag,			
+			SCTE35Command:    SCTE35Commandtag,
 		}
 		s.plCache.SetDateRange(DateRange)
+		// fmt.Println("################daterange:", DateRange)
 	}
 	//Add segment to media playlist and buffer
 	s.plCache.AppendSegment(&m3u8.MediaSegment{SeqId: seg.SeqNo, Duration: seg.Duration, URI: seg.Name})
