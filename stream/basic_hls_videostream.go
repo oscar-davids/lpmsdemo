@@ -110,7 +110,7 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	nanosec := int64(seg.Duration * 1000000000.0)
 	nowplus := now.Add(time.Duration(nanosec))
 	nowplusend := now.Add(time.Duration(nanosec + nanosec))
-	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || seg.isYolo >= 0 {
+	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || seg.IsYolo >= 0 {
 		DateRange := &m3u8.DateRange{
 			ID:               "2020",
 			StartDate:        nowplus,
