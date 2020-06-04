@@ -32,7 +32,7 @@ func (t *FFMpegSegmentTranscoder) SetParallelID(pid int) {
 func (t *FFMpegSegmentTranscoder) SetGpuID(gid int) {
 	t.gpuid = gid
 }
-func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, string ,error) {
+func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, string, error) {
 	//Invoke ffmpeg
 	contents := ""
 	contents, err := ffmpeg.Transcode(fname, t.workDir, t.parallelid, t.gpuid, t.tProfiles)

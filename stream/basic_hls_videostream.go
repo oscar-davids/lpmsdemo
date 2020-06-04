@@ -110,7 +110,7 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	nanosec := int64(seg.Duration * 1000000000.0)
 	nowplus := now.Add(time.Duration(nanosec))
 	nowplusend := now.Add(time.Duration(nanosec + nanosec))
-	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || seg.FgContents == ContentsContinue {
+	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || seg.isYolo >= 0 {
 		DateRange := &m3u8.DateRange{
 			ID:               "2020",
 			StartDate:        nowplus,
@@ -124,7 +124,6 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 			SCTE35Command:    SCTE35Commandtag,
 		}
 		s.plCache.SetDateRange(DateRange)
-		// fmt.Println("################daterange:", DateRange)
 	}
 	//Add segment to media playlist and buffer
 	s.plCache.AppendSegment(&m3u8.MediaSegment{SeqId: seg.SeqNo, Duration: seg.Duration, URI: seg.Name})

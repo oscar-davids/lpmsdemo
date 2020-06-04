@@ -86,6 +86,7 @@ type HLSSegment struct {
 	PgDataEnd  bool
 	FgContents int //0:Contents None, 1:ContentsStart, 2:ContentsContinue, 3:ContentsEnd
 	ObjectData string
+	isYolo     int
 }
 
 //Compare playlists by segments
