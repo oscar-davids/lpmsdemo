@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oscar-davids/lpmsdemo/ffmpeg"
 	"github.com/oscar-davids/lpmsdemo/m3u8"
 )
 
@@ -108,12 +107,10 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	case ContentsNone:
 	}
 
-	isYolo := ffmpeg.GetYoloDetectorID()
-
 	nanosec := int64(seg.Duration * 1000000000.0)
 	nowplus := now.Add(time.Duration(nanosec))
 	nowplusend := now.Add(time.Duration(nanosec + nanosec))
-	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || isYolo >= 0 {
+	if seg.FgContents == ContentsStart || seg.FgContents == ContentsEnd || seg.isYolo >= 0 {
 		DateRange := &m3u8.DateRange{
 			ID:               "2020",
 			StartDate:        nowplus,
