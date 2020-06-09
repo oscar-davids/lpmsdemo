@@ -194,7 +194,8 @@ typedef struct LVPDnnContext {
 	boxobject           *object;
     int                 classes;
     char                **result;
-    int                 resultmax;
+    float               reftime;
+    int                 resultnum;    
 	// for log file
     FILE                *logfile;
     int                 framenum;
