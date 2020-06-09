@@ -2344,6 +2344,12 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
     break;
   case DNN_YOLO:    
     if(ctx->boxes != NULL && ctx->probs != NULL ){
+      //init buffer
+       memset(ctx->boxes, 0x00, ctx->output.height*sizeof(box));	    
+	    for (int j = 0; j < ctx->output.height; ++j) 
+        memset(ctx->probs[j], 0x00, ctx->classes * sizeof(float));
+      memset(ctx->object, 0x00, ctx->output.height*sizeof(boxobject));
+
       //av_log(0, AV_LOG_ERROR, "yolo detect = %d %d\n",ctx->output.height,ctx->classes);
       int objecount = 0;
       float xscale = in->width / (float)ctx->input.width;
