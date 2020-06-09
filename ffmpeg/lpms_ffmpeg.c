@@ -244,9 +244,10 @@ float **probs, int classes, boxobject *objects, int* count)
 	*count = 0;
 	int ncount = 0;
   char strtemp[MAXPATH] = {0,};
-  if(ctx->result == NULL || ctx->resultmax >= MAX_YOLO_FRAME) return;
-  sprintf(ctx->result[ctx->resultmax],"{time:%d,",ctx->resultmax);
+  if(ctx == NULL || ctx->result == NULL || ctx->resultnum >= MAX_YOLO_FRAME) return;
 
+  //sprintf(ctx->result[ctx->resultnum],"{time:%d,",ctx->resultnum);
+  sprintf(ctx->result[ctx->resultnum],"{time:%.3f,",ctx->reftime);
 	for (i = 0; i < num; ++i) {
 		int class_id = max_index(probs[i], classes);
 		float prob = probs[i][class_id];
@@ -266,14 +267,14 @@ float **probs, int classes, boxobject *objects, int* count)
 			objects[ncount].prob = prob;
 			objects[ncount].class_id = class_id;
       sprintf(strtemp,"%d %.02f %d %d %d %d,", class_id, prob ,objects[ncount].left, objects[ncount].top, objects[ncount].right, objects[ncount].bot);
-      strcat(ctx->result[ctx->resultmax], strtemp);
+      strcat(ctx->result[ctx->resultnum], strtemp);
 			ncount++;
 		}
 	}
 	*count = ncount;
   if(ncount > 0) {
-    strcat(ctx->result[ctx->resultmax], "}");  
-    ctx->resultmax++;
+    strcat(ctx->result[ctx->resultnum], "}");  
+    ctx->resultnum++;
   }
 }
 //merge transcoding and classify for multi model
@@ -382,7 +383,7 @@ void initcontextlist() {
     }    
       
     t->data->runcount = 0;
-    t->data->resultmax = 0;
+    t->data->resultnum = 0;
     t = t->next;
   }  
 }
@@ -431,14 +432,14 @@ void cleancontextlist() {
           }
           
           context->runcount = 0;
-          context->resultmax = 0;
+          context->resultnum = 0;
       }
       
       t = t->next;
   }
 }
 
-void classifylist(struct AVFrame *frame, int flagHW) {
+void classifylist(struct AVFrame *frame, int flagHW, float reftime) {
   DnnFilterNode *t;
   int ret = 0;
   t = Filters;
@@ -455,6 +456,9 @@ void classifylist(struct AVFrame *frame, int flagHW) {
           continue;
         }
       }
+      //set reftime 
+      t->data->reftime = reftime;
+
       lpms_detectoneframewithctx(t->data,frame);
       t = t->next;
   }
@@ -495,12 +499,16 @@ void getclassifyresult(int runcount, char* strbuffer) {
         av_log(0, AV_LOG_ERROR, "Engine Dnnid Classid & Probability = %d %d %f\n", dnnid, classid, prob);
       }
     } else if(t->data->filter_type == DNN_YOLO) {
-      if(t->data->resultmax > 0) {
+      if(t->data->resultnum > 0) {
         //now we print firstframe and last frame object
         sprintf(strbuffer,"%s", t->data->result[0]);
-        if(t->data->resultmax > 1 && strlen(strbuffer) < MAXPATH / 2) {
-          strcat(strbuffer, t->data->result[t->data->resultmax-1]);
+        for (int  i = 1; i < t->data->resultnum; i++)
+        {
+          if(strlen(strbuffer) < YOLOMAXPATH * 4 / 5) {
+            strcat(strbuffer, t->data->result[i]);
+          }
         }
+        //for DEBUG    
         av_log(0, AV_LOG_ERROR, "%s\n", strbuffer);
       }
 
@@ -1579,6 +1587,7 @@ int transcode(struct transcode_thread *h,
   //added module for classify
   int runclassify = 0;
   int nsamplerate = 0;
+  float framtime = 0.0; //unit second
   int flagHW = AV_HWDEVICE_TYPE_CUDA == ictx->hw_type;
   if(inp->ftimeinterval > 0.0) nsamplerate = (int)(25.0 * inp->ftimeinterval);
   else {
@@ -1696,9 +1705,24 @@ int transcode(struct transcode_thread *h,
         //invoke call classification
         if(DnnFilterNum > 0 && nsamplerate > 0 && (decoded_results->frames - 1) % nsamplerate == 0){
           runclassify++;
+          float sampleinterval = 1.0 / 25.0;
+        
+          if(dframe->pts == AV_NOPTS_VALUE){
+            framtime = 0.0;
+          } else {
+
+              if(ist->r_frame_rate.den > 0.0){
+                sampleinterval = 1.0 / av_q2d(ist->r_frame_rate);
+              } else  {
+                sampleinterval = av_q2d(ist->time_base);    
+              }
+              
+            framtime = (decoded_results->frames - 1) * sampleinterval;
+          }          
           //for DEBUG
+          //av_log(0, AV_LOG_ERROR, "DnnFilter frame time = %f\n",framtime);
           //av_log(0, AV_LOG_INFO, "DnnFilterNum num frame nsamplerate = %d %d\n",DnnFilterNum,decoded_results->frames,nsamplerate);
-          classifylist(dframe, flagHW);          
+          classifylist(dframe, flagHW, framtime);          
         }
       }
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
@@ -2326,6 +2350,19 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       float yscale = in->height / (float)ctx->input.height;
       layer ldata = { 1, ctx->output.height, ctx->output.width, 0, ctx->classes };
       float* pfdata = (float*)ctx->output.data;
+      
+      //convert pts to second
+      /*
+      double dreftime = 0.0;
+      AVStream *video = ctx->input_ctx->streams[ctx->video_stream];
+
+      if(video->r_frame_rate.den > 0.0){
+        dreftime = in->pts / av_q2d(video->r_frame_rate) ;
+      } else  {
+        dreftime = in->pts * av_q2d(video->time_base);    
+      }
+      av_log(0, AV_LOG_ERROR, "yolo detect dreftime= %.3f \n", (float)dreftime);  
+      */
 
       if (get_detection_boxes(pfdata, ldata, 1, 1, 0.5, ctx->probs, ctx->boxes, 0) > 0){
         do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);	
