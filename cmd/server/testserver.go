@@ -7,7 +7,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/woody0105/lpmsdemo/cmd/server"
+	"github.com/oscar-davids/lpmsdemo/detection"
+	"github.com/oscar-davids/lpmsdemo/ffmpeg"
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
@@ -38,6 +39,8 @@ type StreamRequest struct {
 	Name     string
 	Profiles []ProfileRequest
 }
+
+var videoprofiles []ffmpeg.VideoProfile
 
 func allUsers(w http.ResponseWriter, r *http.Request) {
 	db, err := gorm.Open("sqlite3", "test.db")
@@ -85,9 +88,20 @@ func newStream(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(streamRequest.Name)
 	var profiles []ProfileRequest
 	profiles = streamRequest.Profiles
-	fmt.Println(profiles)
-	fmt.Println(profiles[0].Name, profiles[0].Bitrate, profiles[0].Detector)
-	server.StartStream()
+
+	// fmt.Println(profiles)
+	// fmt.Println(profiles[0].Name, profiles[0].Bitrate, profiles[0].Detector)
+
+	for _, profile := range profiles {
+		videoprofile := ffmpeg.VideoProfileLookup[profile.Name]
+		if len(profile.Detector) > 0 {
+			fmt.Println("adding video profile detector:", profile.Detector)
+			videoprofile.Detector = ffmpeg.DetectorProfileLookup[profile.Detector]
+		}
+		videoprofiles = append(videoprofiles, videoprofile)
+	}
+
+	detection.CreateVideoProfile(videoprofiles)
 
 	fmt.Fprintf(w, "New Stream Successfully Created")
 }
