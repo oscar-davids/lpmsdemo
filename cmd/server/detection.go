@@ -1,4 +1,4 @@
-package detection
+package server
 
 import (
 	"context"
@@ -80,7 +80,7 @@ func validDnnfilters() []string {
 }
 
 //main -interval=1.5 -dnnfilter=PDnnDetector,PDnnVioFilter,PDnnOtherFilter -metamode=1 -gpucount=2 -parallel=2 -embededdnn=1
-func startStream() {
+func StartStream() {
 
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
 	flagClass := flag.Int("classid", 0, "class id for classification")

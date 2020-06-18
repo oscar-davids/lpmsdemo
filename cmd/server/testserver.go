@@ -7,10 +7,11 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/woody0105/lpmsdemo/cmd/server"
+
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	// detection "github.com/woody0105/lpmsdemo/detection"
 )
 
 type User struct {
@@ -23,13 +24,6 @@ type UserRequest struct {
 	Name  string `json: "name"`
 	Email string `json: "email"`
 }
-
-var startstreamfunc = detection.startStream
-
-// type StreamRequest struct {
-// 	Name     string                `json: "name"`
-// 	Profiles []ffmpeg.VideoProfile `json: "profiles"`
-// }
 
 type ProfileRequest struct {
 	Name        string
@@ -44,10 +38,6 @@ type StreamRequest struct {
 	Name     string
 	Profiles []ProfileRequest
 }
-
-// type StreamRequest struct{
-// 	Name string `json: "name"`
-// }
 
 func allUsers(w http.ResponseWriter, r *http.Request) {
 	db, err := gorm.Open("sqlite3", "test.db")
@@ -97,7 +87,7 @@ func newStream(w http.ResponseWriter, r *http.Request) {
 	profiles = streamRequest.Profiles
 	fmt.Println(profiles)
 	fmt.Println(profiles[0].Name, profiles[0].Bitrate, profiles[0].Detector)
-	detection.startStream()
+	server.StartStream()
 
 	fmt.Fprintf(w, "New Stream Successfully Created")
 }
