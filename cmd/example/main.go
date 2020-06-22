@@ -88,10 +88,10 @@ func main() {
 	strfilters := flag.String("dnnfilter", "PDnnDetector", "dnn filters for classification")
 	flagClass := flag.Int("classid", 0, "class id for classification")
 	interval := flag.Float64("interval", 1.0, "time interval(unit second) for classification")
-	metamode := flag.Int("metamode", 0, "metadata store mode(default subtitle 0) about output pmegts file")
+	metamode := flag.Int("metamode", 2, "metadata store mode(default subtitle 0) about output pmegts file")
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
-	embededdnn := flag.Int("embededdnn", 0, "if this flag set 1 then run tanscoding and claasify at same C engine")
+	embededdnn := flag.Int("embededdnn", 1, "if this flag set 1 then run tanscoding and claasify at same C engine")
 
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {

@@ -46,21 +46,19 @@ If the build successed, you can find the main execute file in the lpmsdemo folde
 
 For classification needs a trained model file. Please change trained filename(base on tensorflow)  to tmodel.pb  and copy it to the lpmsdemo folder, now you can start the lpms server.
 
-./main or ./main -classid=1 -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter -metamode=1 -gpucount=2 -parallel=2 -embededdnn=1
-
-    classid : class id for classification
+./main or ./main -interval=1.5 -dnnfilter=PDnnDetector,PDnnOtherFilter -metamode=2 -gpucount=2 -parallel=2 -embededdnn=1
   
     interval: time intervals(unit second) for classification
     
     dnnfilter: dnn model name for classification
     
-    metamode: select metadata store type.(0: subtitle(default), 1: ffmpeg metadata, 2: hls timed metadata) 
+    metamode: select metadata store type.(0: subtitle, 1: ffmpeg metadata, 2: hls timed metadata(default)) 
     
     gpucount: Nvidia GPU card count
     
     parallel: concurrent stream count at the same time
     
-    embededdnn: execute dnnmodule while transcoding( 0: execute dnnmodule with file mode, 1: execute dnnmodule while transcoding)
+    embededdnn: execute dnnmodule while transcoding( 0: execute dnnmodule with file mode, 1: execute dnnmodule while transcoding(default))
     
 remark(dnnfilter): Users can use own trained models after register in [here](https://github.com/oscar-davids/lpmsdemo/blob/b9189028be8454cfc34a7186b38c6bfd642b6ba6/ffmpeg/videoprofile.go#L57.).
 The Model trained using the Tensorflow should be a model for classification. In other words, the outputs of the model should be inference values array, not an image buffer.

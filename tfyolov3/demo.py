@@ -11,6 +11,8 @@ import yolo_v3_tiny
 from utils import load_coco_names, draw_boxes, get_boxes_and_inputs, get_boxes_and_inputs_pb, non_max_suppression, \
                   load_graph, letter_box_image
 
+#python demo.py --loopnum=50
+
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string(
@@ -42,8 +44,11 @@ tf.app.flags.DEFINE_float(
     'iou_threshold', 0.4, 'IoU threshold')
 
 tf.app.flags.DEFINE_float(
-    'gpu_memory_fraction', 1.0, 'Gpu memory fraction to use')
+    'gpu_memory_fraction', 0.5, 'Gpu memory fraction to use')
 
+tf.app.flags.DEFINE_integer(
+    'loopnum', 50, 'loopnum')
+    
 def main(argv=None):
 
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)
@@ -57,7 +62,7 @@ def main(argv=None):
     img_resized = letter_box_image(img, FLAGS.size, FLAGS.size, 128)
     img_resized = img_resized.astype(np.float32)
     classes = load_coco_names(FLAGS.class_names)
-
+    
     if FLAGS.frozen_model:
 
         t0 = time.time()
@@ -71,8 +76,9 @@ def main(argv=None):
 
         with tf.Session(graph=frozenGraph, config=config) as sess:
             t0 = time.time()
-            detected_boxes = sess.run(
-                boxes, feed_dict={inputs: [img_resized]})
+            for i in range(1, FLAGS.loopnum):
+                detected_boxes = sess.run(
+                    boxes, feed_dict={inputs: [img_resized]})
 
     else:
         if FLAGS.tiny:
