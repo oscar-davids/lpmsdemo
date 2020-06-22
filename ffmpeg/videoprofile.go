@@ -108,30 +108,6 @@ var VideoProfileLookup = map[string]VideoProfile{
 	"PDnnYoloFilter":  PDnnYoloFilter,
 }
 
-//Some sample detector profiles
-var (
-	DnnDetector = DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
-		ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}
-	DnnVioFilter = DetectorProfile{SampleRate: 30, ModelPath: "tvmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
-		ClassID: 0, MetaMode: 0, ClassName: []string{"violence"}}
-	DnnOtherFilter = DetectorProfile{SampleRate: 30, ModelPath: "tmodel2.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
-		ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}
-	DnnYoloFilter = DetectorProfile{Dnntype: DnnYolo, SampleRate: 30, ModelPath: "tyolov3model.pb", Threshold: 0.6, Input: "inputs", Output: "output_boxes",
-		ClassID: 0, MetaMode: 0, ClassName: []string{"person", "bicycle", "car", "motorbike", "aeroplane",
-			"bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant",
-			"bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
-			"skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli",
-			"carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote",
-			"keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"}}
-)
-
-var DetectorProfileLookup = map[string]DetectorProfile{
-	"DnnDetector":    DnnDetector,
-	"DnnVioFilter":   DnnVioFilter,
-	"DnnOtherFilter": DnnOtherFilter,
-	"DnnYoloFilter":  DnnYoloFilter,
-}
-
 func VideoProfileResolution(p VideoProfile) (int, int, error) {
 	res := strings.Split(p.Resolution, "x")
 	if len(res) < 2 {
