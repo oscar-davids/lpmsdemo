@@ -119,62 +119,63 @@ go build cmd/server/testserver.go
 If the build successed, you can find the testserver executable file in the lpmsdemo folder.
 To test the api server, follow the steps below:
  1. run the api server(broadcaster flag is the mockup address of the broadcaster, set it as the current IP address.)
- ./testserver -broadcaster=xxx.xxx.xxx.xxx
- 2. Create a "stream" with the transcoding profiles and detection profiles you want by sending POST to /stream with name and profiles. For example: 
- ```
- curl --location --request POST '192.168.2.200:8081/stream' \
---header 'Content-Type: application/json' \
---data-raw '{
-  "name": "test_stream",
-  "profiles": [
-    {
-      "name": "P720p25fps16x9",
-      "bitrate": "600k",
-      "fps": 30
-    },
-    {
-      "name": "P360p30fps4x3",
-      "bitrate": "600k",
-      "fps": 30
-    },
-    {
-      "name": "PDnnDetector"
-    }
-  ] 
-}'
- ```
+  ./testserver -broadcaster=xxx.xxx.xxx.xxx
+ 2. Create a "stream" with the transcoding profiles and detection profiles you want by sending POST to /stream with name and profiles.  For example: 
+   ```
+   curl --location --request POST '192.168.2.200:8081/stream' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "name": "test_stream",
+    "profiles": [
+      {
+        "name": "P720p25fps16x9",
+        "bitrate": "600k",
+        "fps": 30
+      },
+      {
+        "name": "P360p30fps4x3",
+        "bitrate": "600k",
+        "fps": 30
+      },
+      {
+        "name": "PDnnDetector"
+      }
+    ] 
+  }'
+   ```
  Supported Detector Profiles: PDnnDetector, PDnnVioFilter, PDnnYoloFilter
+ 
  3. Request a broadcaster address from /broadcaster.
- ```
- curl https://livepeer.com/api/broadcaster
- ```
+   ```
+   curl https://livepeer.com/api/broadcaster
+   ```
  4. POST your .ts segment. to {broadcaster_address}/live/{stream_id}/{media_number}.ts, and get your results. 
- ```
- curl -i -X POST https://test-broadcast-url.live/live/<stream_id>/1.ts \
-  -H "Accept: multipart/mixed" \
-  --data-binary "@source_segment.ts" | munpack
-```
-API Response should look something like this
-```
-HTTP/1.1 200 OK
-Date: Mon, 27 Apr 2020 22:07:17 GMT
-Content-Type: multipart/mixed; boundary=421e8e76020c72589048
-Transfer-Encoding: chunked
---421e8e76020c72589048
-Content-Disposition: attachment; filename="P720p25fps16x9_4.ts"
-Content-Length: 1722080
-Content-Type: video/mp2t; name="P720p25fps16x9_4.ts"
-Detection-Result: content:football match,
-Rendition-Name: P720p25fps16x9
-...Data
---421e8e76020c72589048
-Content-Disposition: attachment; filename="P360p30fps4x3_4.ts"
-Content-Length: 751812
-Content-Type: video/mp2t; name="P360p30fps4x3_4.ts"
-Detection-Result: content:football match,
-Rendition-Name: P360p30fps4x3
-...Data
-```
+   ```
+   curl -i -X POST https://test-broadcast-url.live/live/<stream_id>/1.ts \
+    -H "Accept: multipart/mixed" \
+    --data-binary "@source_segment.ts" | munpack
+  ```
+  API Response should look something like this
+  ```
+  HTTP/1.1 200 OK
+  Date: Mon, 27 Apr 2020 22:07:17 GMT
+  Content-Type: multipart/mixed; boundary=421e8e76020c72589048
+  Transfer-Encoding: chunked
+  --421e8e76020c72589048
+  Content-Disposition: attachment; filename="P720p25fps16x9_4.ts"
+  Content-Length: 1722080
+  Content-Type: video/mp2t; name="P720p25fps16x9_4.ts"
+  Detection-Result: content:football match,
+  Rendition-Name: P720p25fps16x9
+  ...Data
+  --421e8e76020c72589048
+  Content-Disposition: attachment; filename="P360p30fps4x3_4.ts"
+  Content-Length: 751812
+  Content-Type: video/mp2t; name="P360p30fps4x3_4.ts"
+  Detection-Result: content:football match,
+  Rendition-Name: P360p30fps4x3
+  ...Data
+  ```
 
 ### GPU Support
 
