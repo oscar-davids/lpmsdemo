@@ -13,6 +13,7 @@
 
 #ifndef MAX_YOLO_FRAME
 #define MAX_YOLO_FRAME 512
+#define ALLOW_YOLO_FRAME 50
 #endif
 
 // LPMS specific errors

@@ -267,8 +267,13 @@ float **probs, int classes, boxobject *objects, int* count)
 			objects[ncount].prob = prob;
 			objects[ncount].class_id = class_id;
       sprintf(strtemp,"%d %.02f %d %d %d %d,", class_id, prob ,objects[ncount].left, objects[ncount].top, objects[ncount].right, objects[ncount].bot);
-      strcat(ctx->result[ctx->resultnum], strtemp);
-			ncount++;
+      if(strlen(ctx->result[ctx->resultnum]) < MAX_YOLO_FRAME - ALLOW_YOLO_FRAME){
+        strcat(ctx->result[ctx->resultnum], strtemp);
+			  ncount++;
+      } else {
+        break;
+      }
+
 		}
 	}
 	*count = ncount;
@@ -504,7 +509,7 @@ void getclassifyresult(int runcount, char* strbuffer) {
         sprintf(strbuffer,"%s", t->data->result[0]);
         for (int  i = 1; i < t->data->resultnum; i++)
         {
-          if(strlen(strbuffer) < YOLOMAXPATH * 4 / 5) {
+          if(strlen(strbuffer) < YOLOMAXPATH - MAX_YOLO_FRAME) {
             strcat(strbuffer, t->data->result[i]);
           }
         }
@@ -2356,21 +2361,8 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       float yscale = in->height / (float)ctx->input.height;
       layer ldata = { 1, ctx->output.height, ctx->output.width, 0, ctx->classes };
       float* pfdata = (float*)ctx->output.data;
-      
-      //convert pts to second
-      /*
-      double dreftime = 0.0;
-      AVStream *video = ctx->input_ctx->streams[ctx->video_stream];
 
-      if(video->r_frame_rate.den > 0.0){
-        dreftime = in->pts / av_q2d(video->r_frame_rate) ;
-      } else  {
-        dreftime = in->pts * av_q2d(video->time_base);    
-      }
-      av_log(0, AV_LOG_ERROR, "yolo detect dreftime= %.3f \n", (float)dreftime);  
-      */
-
-      if (get_detection_boxes(pfdata, ldata, 1, 1, 0.5, ctx->probs, ctx->boxes, 0) > 0){
+      if (get_detection_boxes(pfdata, ldata, 1, 1, 0.6, ctx->probs, ctx->boxes, 0) > 0){
         do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);	
         get_detections(ctx, in->width, in->height, xscale, yscale, ldata.n, 0.5, ctx->boxes, 
         ctx->probs, ldata.classes, ctx->object, &objecount);
