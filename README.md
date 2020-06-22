@@ -52,13 +52,13 @@ For classification needs a trained model file. Please change trained filename(ba
     
     dnnfilter: dnn model name for classification
     
-    metamode: select metadata store type.(0: subtitle(default), 1: ffmpeg metadata, 2: hls timed metadata) 
+    metamode: select metadata store type.(0: subtitle, 1: ffmpeg metadata, 2: hls timed metadata(default)) 
     
     gpucount: Nvidia GPU card count
     
     parallel: concurrent stream count at the same time
     
-    embededdnn: execute dnnmodule while transcoding( 0: execute dnnmodule with file mode, 1: execute dnnmodule while transcoding)
+    embededdnn: execute dnnmodule while transcoding( 0: execute dnnmodule with file mode, 1: execute dnnmodule while transcoding(default))
     
 remark(dnnfilter): Users can use own trained models after register in [here](https://github.com/oscar-davids/lpmsdemo/blob/b9189028be8454cfc34a7186b38c6bfd642b6ba6/ffmpeg/videoprofile.go#L57.).
 The Model trained using the Tensorflow should be a model for classification. In other words, the outputs of the model should be inference values array, not an image buffer.
