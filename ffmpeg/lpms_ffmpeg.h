@@ -109,6 +109,7 @@ typedef struct boxobject {
 	int left, top, right, bot;
 	float prob;
 	int class_id;
+    int track_id;
     int frameid;
 } boxobject;
 
