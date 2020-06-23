@@ -2357,14 +2357,14 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
 
       //av_log(0, AV_LOG_ERROR, "yolo detect = %d %d\n",ctx->output.height,ctx->classes);
       int objecount = 0;
-      float xscale = in->width / (float)ctx->input.width;
-      float yscale = in->height / (float)ctx->input.height;
+      float xscale = 1.0;//in->width / (float)ctx->input.width;
+      float yscale = 1.0;//in->height / (float)ctx->input.height;
       layer ldata = { 1, ctx->output.height, ctx->output.width, 0, ctx->classes };
       float* pfdata = (float*)ctx->output.data;
 
       if (get_detection_boxes(pfdata, ldata, 1, 1, 0.7, ctx->probs, ctx->boxes, 0) > 0){
-        do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);	
-        get_detections(ctx, in->width, in->height, xscale, yscale, ldata.n, 0.5, ctx->boxes, 
+        do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);
+        get_detections(ctx, ctx->input.width, ctx->input.height, xscale, yscale, ldata.n, 0.5, ctx->boxes, 
         ctx->probs, ldata.classes, ctx->object, &objecount);
       }
       ctx->runcount ++;      
