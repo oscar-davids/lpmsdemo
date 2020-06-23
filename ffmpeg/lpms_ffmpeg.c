@@ -267,7 +267,7 @@ float **probs, int classes, boxobject *objects, int* count)
 			objects[ncount].prob = prob;
 			objects[ncount].class_id = class_id;
       sprintf(strtemp,"%d %.02f %d %d %d %d,", class_id, prob ,objects[ncount].left, objects[ncount].top, objects[ncount].right, objects[ncount].bot);
-      if(strlen(ctx->result[ctx->resultnum]) < MAX_YOLO_FRAME - ALLOW_YOLO_FRAME){
+      if(strlen(ctx->result[ctx->resultnum]) < YOLO_FRESULTMAXPATH - YOLO_FRESULTALLOWPATH){
         strcat(ctx->result[ctx->resultnum], strtemp);
 			  ncount++;
       } else {
@@ -2362,7 +2362,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
       layer ldata = { 1, ctx->output.height, ctx->output.width, 0, ctx->classes };
       float* pfdata = (float*)ctx->output.data;
 
-      if (get_detection_boxes(pfdata, ldata, 1, 1, 0.6, ctx->probs, ctx->boxes, 0) > 0){
+      if (get_detection_boxes(pfdata, ldata, 1, 1, 0.7, ctx->probs, ctx->boxes, 0) > 0){
         do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);	
         get_detections(ctx, in->width, in->height, xscale, yscale, ldata.n, 0.5, ctx->boxes, 
         ctx->probs, ldata.classes, ctx->object, &objecount);
@@ -2909,7 +2909,7 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
 	    ctx->object = (boxobject*)calloc(ctx->output.height, sizeof(boxobject));
       //for result
       ctx->result = (char**)calloc(MAX_YOLO_FRAME, sizeof(char*));
-	    for (int j = 0; j < MAX_YOLO_FRAME; ++j) ctx->result[j] = (char*)calloc(MAXPATH, sizeof(char));
+	    for (int j = 0; j < MAX_YOLO_FRAME; ++j) ctx->result[j] = (char*)calloc(YOLO_FRESULTMAXPATH, sizeof(char));
       
     break;
 
