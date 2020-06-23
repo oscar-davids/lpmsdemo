@@ -12,8 +12,9 @@
 #endif
 
 #ifndef MAX_YOLO_FRAME
-#define MAX_YOLO_FRAME 512
-#define ALLOW_YOLO_FRAME 50
+#define MAX_YOLO_FRAME 256
+#define YOLO_FRESULTMAXPATH     512 //max 16 object in a frame
+#define YOLO_FRESULTALLOWPATH    50
 #endif
 
 // LPMS specific errors
