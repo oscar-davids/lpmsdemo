@@ -259,6 +259,9 @@ float **probs, int classes, boxobject *objects, int* count)
 			objects[ncount].right = b.w * fx;
 			objects[ncount].top = b.y * fy;
 			objects[ncount].bot = b.h * fy;
+      float fw = b.w - b.x;
+      float fh = b.h - b.y;
+      if(fh > 0.0 && fw / fh > 6.0 ) continue;
 
 			if (objects[ncount].left < 0) objects[ncount].left = 0;
 			if (objects[ncount].right > nw - 1) objects[ncount].right = nw - 1;
@@ -2364,7 +2367,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
 
       if (get_detection_boxes(pfdata, ldata, 1, 1, 0.7, ctx->probs, ctx->boxes, 0) > 0){
         do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);
-        get_detections(ctx, ctx->input.width, ctx->input.height, xscale, yscale, ldata.n, 0.5, ctx->boxes, 
+        get_detections(ctx, ctx->input.width, ctx->input.height, xscale, yscale, ldata.n, 0.7, ctx->boxes, 
         ctx->probs, ldata.classes, ctx->object, &objecount);
       }
       ctx->runcount ++;      
