@@ -620,7 +620,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		if len(tempdata) > 0 {
 			if isyolo > 0 {
 				replaceddata := ""
-				for i := 0; i < len(PDnnYoloFilter.Detector.ClassName[i]); i++ {
+				for i := len(PDnnYoloFilter.Detector.ClassName) - 1; i >= 0; i-- {
 					orig := "," + strconv.Itoa(i)
 					new := "," + PDnnYoloFilter.Detector.ClassName[i]
 					replaceddata = strings.Replace(tempdata, orig, new, -1)
