@@ -8,7 +8,7 @@
 #define MAXPATH 256
 #endif
 #ifndef YOLOMAXPATH
-#define YOLOMAXPATH 4096
+#define YOLOMAXPATH 8192
 #endif
 
 #ifndef MAX_YOLO_FRAME
