@@ -27,9 +27,13 @@ https://golang.org/doc/install
 
 ### Build 
 
-check PKG_CONFIG_PATH environment value.
+check PKG_CONFIG_PATH,CGO_CFLAGS,CGO_LDFLAGS environment values.
 
 export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:$HOME/compiled/lib/pkgconfig"
+
+export CGO_CFLAGS="-I$HOME/compiled/include"
+
+export CGO_LDFLAGS="-L$HOME/compiled/lib"
 
 ```
 git clone https://github.com/oscar-davids/lpmsdemo.git 
