@@ -26,7 +26,6 @@ import (
 	"github.com/oscar-davids/lpmsdemo/stream"
 
 	"github.com/gorilla/mux"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
 type StreamRequest struct {
@@ -204,7 +203,7 @@ func handleRequests() {
 	myRouter.HandleFunc("/broadcaster", getBroadcaster).Methods("GET")
 	// broadcaster
 	myRouter.HandleFunc("/live/{stream_id}/{media_number}", handlePush).Methods("POST")
-	log.Fatal(http.ListenAndServe(":8081", myRouter))
+	log.Fatal(http.ListenAndServe(":8080", myRouter))
 }
 
 func main() {
