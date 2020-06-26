@@ -26,7 +26,6 @@ import (
 	"github.com/oscar-davids/lpmsdemo/stream"
 
 	"github.com/gorilla/mux"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
 type StreamRequest struct {
