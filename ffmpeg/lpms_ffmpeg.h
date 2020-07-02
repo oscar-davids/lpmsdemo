@@ -84,6 +84,7 @@ void output_results_destroy(output_results* output_results);
 
 
 #define MAX_DNNFILTER 8 //multiple model max
+#define ERROR 1e5       //track dist tolerance
 
 typedef enum {DNN_FLOAT = 1, DNN_UINT8 = 4} DNNDataType;
 typedef enum {DNN_NATIVE, DNN_TF} DNNBackendType;
@@ -123,6 +124,24 @@ typedef struct layer {
 	int classes;
 } layer;
 
+
+//for object track
+typedef struct boxarry {
+    boxobject *boxptr;
+    int count;
+}boxarry;
+
+typedef struct Node *NodePtr;
+struct Node {
+    boxarry Element;
+    NodePtr Next, Last;
+};
+
+typedef struct Deque *DequePrt;
+struct Deque {
+    NodePtr Front, Rear;
+    int count;
+};
 
 typedef struct DNNData{
     void *data;
@@ -198,7 +217,9 @@ typedef struct LVPDnnContext {
     int                 classes;
     char                **result;
     float               reftime;
-    int                 resultnum;    
+    int                 resultnum;
+    //for object tracking
+    DequePrt               dqtracking;
 	// for log file
     FILE                *logfile;
     int                 framenum;
@@ -210,6 +231,14 @@ typedef struct DnnFilterNode {
   struct DnnFilterNode *next;
 } DnnFilterNode;
 
+
+DequePrt CreateDeque();
+void  DestroyDeque(DequePrt D);
+int Push( boxarry X, DequePrt D );
+boxarry Pop( DequePrt D );
+int Inject( boxarry X, DequePrt D );
+boxarry Eject( DequePrt D );
+int IsEmpty(DequePrt D);
 
 
 int     lpms_dnninit(char* fmodelpath, char* input, char* output, int samplerate, float fthreshold);
