@@ -23,7 +23,6 @@ const int lpms_ERR_FILTERS = FFERRTAG('F','L','T','R');
 const int lpms_ERR_PACKET_ONLY = FFERRTAG('P','K','O','N');
 const int lpms_ERR_OUTPUTS = FFERRTAG('O','U','T','P');
 
-//
 // Internal transcoder data structures
 //
 struct input_ctx {
@@ -285,6 +284,11 @@ float **probs, int classes, boxobject *objects, int* count)
     ctx->resultnum++;
   }
 }
+
+void get_detections_with_track(LVPDnnContext *ctx, int nw, int nh, float fx, float fy, int num, float thresh, box *boxes, 
+float **probs, int classes, boxobject *objects, int* count);
+//
+
 //merge transcoding and classify for multi model
 DnnFilterNode* Filters = NULL;
 int DnnFilterNum = 0;
@@ -387,7 +391,7 @@ void initcontextlist() {
       memset(t->data->object, 0x00, t->data->output.height*sizeof(boxobject));
       //for result      
 	    for (int j = 0; j < MAX_YOLO_FRAME; ++j) 
-        memset(t->data->result[j], 0x00, MAXPATH);   
+        memset(t->data->result[j], 0x00, MAXPATH);
     }    
       
     t->data->runcount = 0;
@@ -2367,7 +2371,7 @@ static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in)
 
       if (get_detection_boxes(pfdata, ldata, 1, 1, 0.7, ctx->probs, ctx->boxes, 0) > 0){
         do_nms(ctx->boxes, ctx->probs, ldata.n, ldata.classes, 0.4);
-        get_detections(ctx, ctx->input.width, ctx->input.height, xscale, yscale, ldata.n, 0.7, ctx->boxes, 
+        get_detections_with_track(ctx, ctx->input.width, ctx->input.height, xscale, yscale, ldata.n, 0.7, ctx->boxes, 
         ctx->probs, ldata.classes, ctx->object, &objecount);
       }
       ctx->runcount ++;      
@@ -2913,7 +2917,8 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
       //for result
       ctx->result = (char**)calloc(MAX_YOLO_FRAME, sizeof(char*));
 	    for (int j = 0; j < MAX_YOLO_FRAME; ++j) ctx->result[j] = (char*)calloc(YOLO_FRESULTMAXPATH, sizeof(char));
-      
+      //for object tracking 
+      ctx->dqtracking= CreateDeque();
     break;
 
   default:
@@ -2996,6 +3001,10 @@ void  lpms_dnnfreewithctx(LVPDnnContext *context)
     if(context->result){
       free(context->result);
       context->result = NULL;
+    }
+    if(context->dqtracking){
+      DestroyDeque(context->dqtracking);
+      free(context->dqtracking);
     }
     break;
 
@@ -3262,4 +3271,281 @@ int lpms_getvideoinfo(char* ivpath, Vinfo* vinfo)
 	return DNN_SUCCESS;
 }
 
+DequePrt CreateDeque(){
+    NodePtr Tnode = (NodePtr)malloc(sizeof(struct Node));   // Create Node
+    DequePrt TDeque = (DequePrt)malloc(sizeof(struct Deque));  // Create Queue
+
+    Tnode->Next = Tnode->Last = NULL;
+    TDeque->Front = TDeque->Rear = Tnode;
+    TDeque ->count = 0;
+    return TDeque; 
+}
+void  DestroyDeque(DequePrt pdqtrack)
+{
+  if(pdqtrack == NULL) return;
+  NodePtr p = pdqtrack->Front->Next;
+	while (p != NULL)
+	{
+    if(p->Element.boxptr != NULL){
+      free(p->Element.boxptr);		
+    }
+    NodePtr ptmp = p;    
+		p = p->Next;
+    free(ptmp);
+	}
+  if(pdqtrack->Front != NULL)
+    free(pdqtrack->Front);
+}
+
+
+int Push( boxarry X, DequePrt D ){    // Insert element at beginning 
+    NodePtr Tnode = (NodePtr)malloc(sizeof(struct Node));
+
+    if(!Tnode)
+        return 0;
+
+    // insert
+    Tnode->Element = X;
+    Tnode->Last = D->Front;
+    Tnode->Next = D->Front->Next;
+ 
+    if(D->Front->Next)  // Original Front Node's Last points to newly inserted node
+        D->Front->Next->Last = Tnode;
+
+    D->Front->Next = Tnode; //Front's Next prints to newly inserted node
+    // if dequeue is empty
+    if(D->Front == D->Rear)
+        D->Rear = Tnode;// Update Rear node
+
+    D->count++; 
+    return 1;
+}
+
+boxarry Pop( DequePrt D ){    //Delete first element
+    if(D->Front == D->Rear){ // check if queue empty
+      boxarry emptybox;
+      return emptybox;
+    }
+
+    NodePtr Tnode = D->Front->Next;
+    
+    if(D->Front->Next == D->Rear)
+        D->Rear = D->Front;
+    
+    D->Front->Next = D->Front->Next->Next;
+
+    boxarry temp;
+    temp = Tnode->Element;
+    free(Tnode->Element.boxptr);
+    free(Tnode);
+    D->count--;
+    return temp;
+}
+
+int Inject( boxarry X, DequePrt D ){    //Add element at the end 
+    NodePtr Tnode = (NodePtr)malloc(sizeof(struct Node));   // create node
+    if(!Tnode)
+        return ERROR;
+    //insert
+    Tnode->Element = X;
+    Tnode->Next = NULL;
+    D->Rear->Next = Tnode;
+    Tnode->Last = D->Rear;
+
+    if(D->Rear == D->Front)
+        D->Front->Next = Tnode;
+    D->Rear = Tnode;//update Rear
+    D->count++;
+    return 1;
+}
+
+boxarry Eject( DequePrt D ){    //Delete last element
+    if(D->Front == D->Rear){
+        boxarry emptybox;
+        return emptybox;
+    }
+
+    if(D->Rear->Last == D->Front)
+        D->Front = D->Rear->Last;
+
+    NodePtr Tnode = D->Rear;
+    boxarry temp = D->Rear->Element;
+    D->Rear = D->Rear->Last;
+    D->Rear->Next = NULL;
+    free(Tnode->Element.boxptr);
+    free(Tnode);
+    D->count--;
+    return temp;
+}
+
+int IsEmpty(DequePrt D)
+{
+	if (D->Front == D->Rear)
+		return 1;
+	else
+		return 0;
+}
+
+void Traverse(DequePrt D)
+{
+	if (IsEmpty(D))
+	{
+		printf("error! queue empty.");
+		return;
+	}
+
+	printf("traversing result: ");
+	NodePtr p = D->Front->Next;
+	while (p != NULL)
+	{
+		printf("%d ", p->Element.count);
+    for(int i=0; i < p->Element.count; i++){
+      printf("track id = %d top = %d", p->Element.boxptr[i].track_id, p->Element.boxptr[i].top);
+    }
+		p = p->Next;
+	}
+	printf("\n");
+}
+
+int track_id[80] = {0};
+
+boxobject* tracking_id(LVPDnnContext *ctx, boxobject *cur_bbox_vec, int numofobjects, int const change_history, int const frames_story, int const max_dist){
+    int prev_track_id_present = 0;
+    boxarry cur_box_arry;
+    boxobject *bbox_untracked;
+    DequePrt pdeque = ctx->dqtracking;
+
+    if(pdeque == NULL) return cur_bbox_vec;
+
+    bbox_untracked = (boxobject*)malloc(numofobjects * sizeof(boxobject)); 
+    memcpy(bbox_untracked, cur_bbox_vec, numofobjects* sizeof(boxobject));
+    
+    
+    cur_box_arry.boxptr = bbox_untracked;
+    cur_box_arry.count = numofobjects;
+    if (pdeque->count > 0)
+        prev_track_id_present = 1;
+
+    if (!prev_track_id_present) {
+        for (int i = 0; i < numofobjects; i++){
+            bbox_untracked[i].track_id = ++track_id[cur_bbox_vec[i].class_id];
+        }
+        Push(cur_box_arry, pdeque);
+        if (pdeque->count > frames_story) Eject(pdeque);
+        return bbox_untracked;
+    }
+
+    int dist_vec[numofobjects];
+    memset(dist_vec, 1000000, numofobjects * sizeof(int) );
+
+    NodePtr tempptr = pdeque->Front->Next;  
+    while (tempptr != NULL)
+    {
+        boxobject *objarr = tempptr->Element.boxptr;      
+        int objectcount = tempptr->Element.count;
+        
+        for (int l = 0; l < objectcount; l++){
+	          int cur_index = -1;
+            for (int m = 0; m < numofobjects; m++){
+                boxobject const curobj = cur_bbox_vec[m];
+                if(objarr[l].class_id == curobj.class_id){
+                    float center_x_diff = (float)(objarr[l].left + objarr[l].right) / 2 - (float)(curobj.left + curobj.right) / 2;
+                    float center_y_diff = (float)(objarr[l].top + objarr[l].bot) / 2 - (float)(curobj.top + curobj.bot) / 2;
+                    int cur_dist = sqrt(center_x_diff * center_x_diff + center_y_diff * center_y_diff);
+                    if (cur_dist < max_dist && ( curobj.track_id == 0 || dist_vec[m] > cur_dist) ) {
+                        dist_vec[m] = cur_dist;
+                        cur_index = m;
+                    }
+                }
+            }
+
+            int track_id_absent = 1;
+            for(int n=0; n < numofobjects; n++){
+               if(bbox_untracked[n].track_id == objarr[l].track_id && bbox_untracked[n].class_id == objarr[l].class_id){
+                   track_id_absent = 0;
+                   break;
+               }
+            }
+
+            if(cur_index >= 0 && track_id_absent){
+                bbox_untracked[cur_index].track_id = objarr[l].track_id;
+	        }
+        }
+    
+        tempptr = tempptr ->Next;
+    }
+
+    for (size_t i = 0; i < numofobjects; i++)
+        if (bbox_untracked[i].track_id == 0)
+            bbox_untracked[i].track_id = ++track_id[cur_bbox_vec[i].class_id];
+            
+    if (change_history) {
+        Push(cur_box_arry, pdeque);
+        if (pdeque->count > frames_story) Eject(pdeque);
+    }
+    // free(bbox_untracked);
+    return bbox_untracked;
+}
+
+
+void get_detections_with_track(LVPDnnContext *ctx, int nw, int nh, float fx, float fy, int num, float thresh, box *boxes, 
+float **probs, int classes, boxobject *objects, int* count)
+{
+	int i;
+	*count = 0;
+	int ncount = 0;
+  char strtemp[MAXPATH] = {0,};
+  if(ctx == NULL || ctx->result == NULL || ctx->resultnum >= MAX_YOLO_FRAME) return;
+
+  //sprintf(ctx->result[ctx->resultnum],"{time:%d,",ctx->resultnum);
+  sprintf(ctx->result[ctx->resultnum],"{time:%.3f,",ctx->reftime);
+	for (i = 0; i < num; ++i) {
+		int class_id = max_index(probs[i], classes);
+		float prob = probs[i][class_id];
+		if (prob > thresh) {
+
+			box b = boxes[i];
+
+			objects[ncount].left = b.x * fx;
+			objects[ncount].right = b.w * fx;
+			objects[ncount].top = b.y * fy;
+			objects[ncount].bot = b.h * fy;
+      float fw = b.w - b.x;
+      float fh = b.h - b.y;
+      if(fh > 0.0 && fw / fh > 6.0 ) continue;
+
+			if (objects[ncount].left < 0) objects[ncount].left = 0;
+			if (objects[ncount].right > nw - 1) objects[ncount].right = nw - 1;
+			if (objects[ncount].top < 0) objects[ncount].top = 0;
+			if (objects[ncount].bot > nh - 1)objects[ncount].bot = nh - 1;
+			objects[ncount].prob = prob;
+			objects[ncount].class_id = class_id;
+      // sprintf(strtemp,"%d %.02f %d %d %d %d,", class_id, prob ,objects[ncount].left, objects[ncount].top, objects[ncount].right, objects[ncount].bot);
+      if(strlen(ctx->result[ctx->resultnum]) < YOLO_FRESULTMAXPATH - YOLO_FRESULTALLOWPATH){
+        // strcat(ctx->result[ctx->resultnum], strtemp);
+			  ncount++;
+      } else {
+        break;
+      }
+
+		}
+	}
+
+  boxobject *objectswithtrack;
+  objectswithtrack = tracking_id(ctx, objects, ncount, 1, 1, 50);
+  for(int j = 0; j < ncount; j++){
+      sprintf(strtemp,"%d %.02f %d %d %d %d %d,", objectswithtrack[j].class_id, objectswithtrack[j].prob, objectswithtrack[j].track_id, objectswithtrack[j].left, objectswithtrack[j].top, objectswithtrack[j].right, objectswithtrack[j].bot);
+      if(strlen(ctx->result[ctx->resultnum]) < YOLO_FRESULTMAXPATH - YOLO_FRESULTALLOWPATH){
+        strcat(ctx->result[ctx->resultnum], strtemp);
+      } else {
+        break;
+      }
+  }
+
+	*count = ncount;
+  if(ncount > 0) {
+    strcat(ctx->result[ctx->resultnum], "}");  
+    ctx->resultnum++;
+  }
+}
 #endif
