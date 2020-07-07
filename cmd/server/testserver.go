@@ -30,21 +30,20 @@ import (
 )
 
 type StreamRequest struct {
-	Name     string `json:"name"`
+	Name     string                   `json:"name"`
 	Profiles []map[string]interface{} `json:"profiles"`
 }
 
 type StreamResponse struct {
-	Name string
-	Profiles []ffmpeg.VideoProfile
-	id string
+	Name      string
+	Profiles  []ffmpeg.VideoProfile
+	id        string
 	createdAt int64
 }
 
 type BroadcasterAddress struct {
 	Address string `json:"address"`
 }
-
 
 var globalTranscodeprofiles []ffmpeg.VideoProfile
 var globalStreamID string
@@ -79,7 +78,6 @@ func getBroadcaster(w http.ResponseWriter, r *http.Request) {
 }
 
 func newStream(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("New Stream Endpoint Hit")
 	w.Header().Set("Content-Type", "application/json")
 
 	var streamRequest StreamRequest
@@ -102,7 +100,7 @@ func newStream(w http.ResponseWriter, r *http.Request) {
 				name := profile["name"].(string)
 				bitrate := fmt.Sprintf("%d", uint(profile["bitrate"].(float64)))
 				bitrate = strings.TrimSuffix(bitrate, "000")
-				bitrate = bitrate+"k"
+				bitrate = bitrate + "k"
 				framerate := uint(profile["fps"].(float64))
 				resolution := fmt.Sprintf("%vx%v", profile["width"], profile["height"])
 				transcodeprofiles = append(transcodeprofiles, ffmpeg.VideoProfile{Name: name, Bitrate: bitrate, Framerate: framerate, Resolution: resolution})
@@ -144,12 +142,12 @@ func handlePush(w http.ResponseWriter, r *http.Request) {
 	r.URL = &url.URL{Scheme: "http", Host: r.Host, Path: r.URL.Path}
 	vars := mux.Vars(r)
 	stream_id := vars["stream_id"]
-	if (stream_id != globalStreamID) {
+	if stream_id != globalStreamID {
 		httpErr := fmt.Sprintf(`Cannot recognize stream_id: %s`, stream_id)
 		glog.Error(httpErr)
 		http.Error(w, httpErr, http.StatusBadRequest)
 		return
-	} 
+	}
 
 	fname := path.Base(r.URL.Path)
 	seq, err := strconv.ParseUint(strings.TrimSuffix(fname, ".ts"), 10, 64)

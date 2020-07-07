@@ -1597,6 +1597,9 @@ int transcode(struct transcode_thread *h,
   AVPacket ipkt;
   AVFrame *dframe = NULL;
   //added module for classify
+
+  if (!inp || !ictx) main_err("transcoder: Missing input params\n")
+
   int runclassify = 0;
   int nsamplerate = 0;
   float framtime = 0.0; //unit second
@@ -1609,8 +1612,7 @@ int transcode(struct transcode_thread *h,
   initcontextlist();
   //av_log(0, AV_LOG_ERROR, "nsamplerate = %d \n",nsamplerate);
 
-  if (!inp) main_err("transcoder: Missing input params\n")
-
+ 
   if (!ictx->ic->pb) {
     ret = avio_open(&ictx->ic->pb, inp->fname, AVIO_FLAG_READ);
     if (ret < 0) main_err("Unable to reopen file");
