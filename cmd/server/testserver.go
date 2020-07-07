@@ -84,6 +84,7 @@ func newStream(w http.ResponseWriter, r *http.Request) {
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(reqBody, &streamRequest)
 
+	fmt.Println(streamRequest.Name)
 	var profiles []map[string]interface{}
 	profiles = streamRequest.Profiles
 
@@ -123,8 +124,6 @@ func newStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Printf("New stream created. Name=%s, Id=%s\n", streamRequest.Name, globalStreamID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(js)
