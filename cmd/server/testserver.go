@@ -18,6 +18,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -29,15 +30,23 @@ import (
 )
 
 type StreamRequest struct {
-	Name     string
-	Profiles []ffmpeg.VideoProfile
+	Name     string                   `json:"name"`
+	Profiles []map[string]interface{} `json:"profiles"`
+}
+
+type StreamResponse struct {
+	Name      string
+	Profiles  []ffmpeg.VideoProfile
+	id        string
+	createdAt int64
 }
 
 type BroadcasterAddress struct {
 	Address string `json:"address"`
 }
 
-var transcodeprofiles []ffmpeg.VideoProfile
+var globalTranscodeprofiles []ffmpeg.VideoProfile
+var globalStreamID string
 var broadcaster string
 var broadcastercfg string
 
@@ -56,44 +65,69 @@ func RandName() string {
 }
 
 func getBroadcaster(w http.ResponseWriter, r *http.Request) {
-	var broadcasteraddress BroadcasterAddress
+	var broadcasteraddress []BroadcasterAddress
+
+	if broadcaster != broadcastercfg {
+		broadcaster = broadcastercfg
+	}
 	if len(broadcaster) > 0 {
-		broadcasteraddress = BroadcasterAddress{Address: broadcaster}
+		broadcasteraddress = []BroadcasterAddress{BroadcasterAddress{Address: broadcaster}}
 	}
 
 	json.NewEncoder(w).Encode(broadcasteraddress)
 }
 
 func newStream(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("New Stream Endpoint Hit")
 	w.Header().Set("Content-Type", "application/json")
 
 	var streamRequest StreamRequest
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(reqBody, &streamRequest)
 
-	fmt.Println(streamRequest.Name)
-	var profiles []ffmpeg.VideoProfile
+	var profiles []map[string]interface{}
 	profiles = streamRequest.Profiles
 
-	var detectionprofiles []ffmpeg.VideoProfile
+	detectionprofiles := []ffmpeg.VideoProfile{}
+	transcodeprofiles := []ffmpeg.VideoProfile{}
 
 	for _, profile := range profiles {
-		if strings.Index(profile.Name, "PDnn") < 0 {
-			videoprofile := ffmpeg.VideoProfileLookup[profile.Name]
-			transcodeprofiles = append(transcodeprofiles, videoprofile)
+		if strings.Index(profile["name"].(string), "PDnn") < 0 {
+			videoprofile := ffmpeg.VideoProfileLookup[profile["name"].(string)]
+			if videoprofile.Name != "" {
+				transcodeprofiles = append(transcodeprofiles, videoprofile)
+			} else {
+				name := profile["name"].(string)
+				bitrate := fmt.Sprintf("%d", uint(profile["bitrate"].(float64)))
+				bitrate = strings.TrimSuffix(bitrate, "000")
+				bitrate = bitrate + "k"
+				framerate := uint(profile["fps"].(float64))
+				resolution := fmt.Sprintf("%vx%v", profile["width"], profile["height"])
+				transcodeprofiles = append(transcodeprofiles, ffmpeg.VideoProfile{Name: name, Bitrate: bitrate, Framerate: framerate, Resolution: resolution})
+			}
 		} else {
-			detectionprofile := ffmpeg.VideoProfileLookup[profile.Name]
+			detectionprofile := ffmpeg.VideoProfileLookup[profile["name"].(string)]
 			detectionprofiles = append(detectionprofiles, detectionprofile)
 		}
 
 	}
 
 	detection.InitDnnEngine(detectionprofiles)
+	globalTranscodeprofiles = transcodeprofiles
 
-	broadcaster = broadcastercfg
+	//Create Json Response
+	globalStreamID = RandName()
+	res := map[string]interface{}{"name": streamRequest.Name, "profiles": profiles, "id": globalStreamID, "createdAt": time.Now().Unix()}
 
-	fmt.Fprintf(w, "New Stream Successfully Created")
+	js, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("New stream created. Name=%s, Id=%s\n", streamRequest.Name, globalStreamID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
 }
 
 func handlePush(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +143,12 @@ func handlePush(w http.ResponseWriter, r *http.Request) {
 	r.URL = &url.URL{Scheme: "http", Host: r.Host, Path: r.URL.Path}
 	vars := mux.Vars(r)
 	stream_id := vars["stream_id"]
+	if stream_id != globalStreamID {
+		httpErr := fmt.Sprintf(`Cannot recognize stream_id: %s`, stream_id)
+		glog.Error(httpErr)
+		http.Error(w, httpErr, http.StatusBadRequest)
+		return
+	}
 
 	fname := path.Base(r.URL.Path)
 	seq, err := strconv.ParseUint(strings.TrimSuffix(fname, ".ts"), 10, 64)
@@ -140,13 +180,13 @@ func handlePush(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if stream with transcoding profiles is created
-	if len(transcodeprofiles) <= 0 {
+	if len(globalTranscodeprofiles) <= 0 {
 		http.Error(w, "No Video Profile Created. Create video profile first and try again.", http.StatusInternalServerError)
 		return
 	}
 
 	// transcode and detect
-	resultdata, contents, err := detection.ProcessSegment(seg, stream_id, transcodeprofiles)
+	resultdata, contents, err := detection.ProcessSegment(seg, stream_id, globalTranscodeprofiles)
 	if err != nil {
 		glog.Errorf("Error transcoding: %v", err)
 	} else {
@@ -176,7 +216,7 @@ func handlePush(w http.ResponseWriter, r *http.Request) {
 
 		typ = "video/mp2t"
 
-		profile := transcodeprofiles[i].Name
+		profile := globalTranscodeprofiles[i].Name
 		fname := fmt.Sprintf(`"%s_%d%s"`, profile, seq, ext)
 		hdrs := textproto.MIMEHeader{
 			"Content-Type":        {typ + "; name=" + fname},

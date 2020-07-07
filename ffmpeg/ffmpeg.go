@@ -399,7 +399,7 @@ func (t *Transcoder) ExecuteSetFilter(infname string, Accel Acceleration) (subtf
 func (t *Transcoder) GetContentString(dnnid int, classid int, prob float32) string {
 	srtmetadata := ""
 
-	if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata &&
+	if gpuparallel > 0 && len(dnnsets[0].filters) > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata &&
 		dnnid >= 0 && dnnid < len(dnnsets[0].filters) && classid >= 0 && classid < len(dnnsets[0].filters[dnnid].dnncfg.Detector.ClassName) {
 		srtmetadata = dnnsets[0].filters[dnnid].dnncfg.Detector.ClassName[classid]
 	} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata &&
@@ -607,7 +607,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 	}
 
 	if usednnCengine == false {
-		if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+		if gpuparallel > 0 && len(dnnsets[0].filters) > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
 		} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
@@ -647,7 +647,7 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		//for debug
 		//glog.Infof("Dnn filtering contents metadata : %v %v\n", tempdata, srtmetadata)
 
-		if gpuparallel > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
+		if gpuparallel > 0 && len(dnnsets[0].filters) > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
 		} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
 			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata}, nil
