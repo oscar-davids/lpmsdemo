@@ -3,6 +3,7 @@
 
 #include <libavutil/hwcontext.h>
 #include <libavutil/rational.h>
+#include <libswresample/swresample.h>
 
 #ifndef MAXPATH
 #define MAXPATH 256
@@ -106,6 +107,13 @@ typedef struct Vinfo{
     int framecount;
     float duration;
 } Vinfo;
+
+typedef struct Audioinfo{
+    int input_channels;
+    int input_rate;
+    int input_nb_samples;
+    enum AVSampleFormat input_sample_fmt;
+} Audioinfo;
 
 typedef struct box {
 	float x, y, w, h;
@@ -274,6 +282,8 @@ typedef struct {
 } ds_audio_buffer;
 
 int deepspeech_init();
+SwrContext* get_swrcontext(Audioinfo audio_input);
+int compare_audioinfo(Audioinfo a, Audioinfo b);
 
 #endif
 #endif // _LPMS_FFMPEG_H_

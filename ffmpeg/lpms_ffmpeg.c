@@ -1585,6 +1585,9 @@ handle_r2h_err:
   return ret == AVERROR_EOF ? 0 : ret;
 }
 
+SwrContext* resample_ctx = NULL;      
+Audioinfo cur_audio_input;
+Audioinfo prev_audio_input;
 
 int transcode(struct transcode_thread *h,
   input_params *inp, output_params *params,
@@ -1752,8 +1755,6 @@ int transcode(struct transcode_thread *h,
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
       if (has_frame) ictx->next_pts_a = dframe->pts + dframe->pkt_duration;
 
-      SwrContext* resample_ctx = NULL;
-
       int output_channels = 1;
       int output_rate = 16000;
       int input_channels = dframe->channels;
@@ -1761,35 +1762,33 @@ int transcode(struct transcode_thread *h,
       int input_nb_samples = dframe->nb_samples;
       enum AVSampleFormat input_sample_fmt = ictx->ac->sample_fmt;
       enum AVSampleFormat output_sample_fmt = AV_SAMPLE_FMT_S16;
-      resample_ctx = swr_alloc_set_opts(resample_ctx, av_get_default_channel_layout(output_channels),output_sample_fmt,output_rate,
-                            av_get_default_channel_layout(input_channels),input_sample_fmt, input_rate,0,NULL);
-      if(!resample_ctx){
-          printf("av_audio_resample_init fail!!!\n");
-          return -1;
+
+      cur_audio_input.input_channels = dframe->channels;
+      cur_audio_input.input_rate = dframe->sample_rate;
+      cur_audio_input.input_nb_samples = dframe->nb_samples;
+      cur_audio_input.input_sample_fmt = ictx->ac->sample_fmt;
+      
+      if ( compare_audioinfo(cur_audio_input, prev_audio_input) != 0){
+        if (resample_ctx != NULL){
+          swr_free(&resample_ctx);
+        }
+        resample_ctx = get_swrcontext(cur_audio_input);  
       }
-      swr_init(resample_ctx);
+
+
       uint8_t* out_buffer = (uint8_t*)av_malloc(MAX_AUDIO_FRAME_SIZE);
-            //resample
       memset(out_buffer,0x00,sizeof(out_buffer));
 
-      // size = dframe->nb_samples * av_get_bytes_per_sample((AVSampleFormat)dframe->format);
-      // av_log(0, AV_LOG_INFO, "");
       int out_nb_samples = av_rescale_rnd(swr_get_delay(resample_ctx, input_rate) + input_nb_samples, output_rate, input_rate, AV_ROUND_UP);
-
       int out_samples = swr_convert(resample_ctx,&out_buffer,out_nb_samples,(const uint8_t **)dframe->data,dframe->nb_samples);
       int out_buffer_size;
       if(out_samples > 0){
           out_buffer_size = av_samples_get_buffer_size(NULL,output_channels ,out_samples, output_sample_fmt, 1);
           memcpy(audio_buffer.buffer + audio_buffer.buffer_size, out_buffer, out_buffer_size);
           audio_buffer.buffer_size += out_buffer_size;
-          
-          // for debug
-          // fwrite(out_buffer, 1, out_buffer_size, audio_dst_file2);
-          // DS_FeedAudioContent(streamctx, out_buffer, out_buffer_size);
       }
 
-      // av_log(0, AV_LOG_INFO, "input_nb_samples:%d, outnbsamples: %d, outsamples:%d, bufsize:%d\n",input_nb_samples, out_nb_samples, out_samples, out_buffer_size);
-      swr_free(&resample_ctx);
+      memcpy(&prev_audio_input, &cur_audio_input, sizeof(Audioinfo));
       av_free(out_buffer);
     }
 
@@ -1840,6 +1839,7 @@ whileloop_end:
 
   const char *textres = NULL;
   textres = DS_SpeechToText(dsctx, audio_buffer.buffer, audio_buffer.buffer_size);
+  
   if ( strlen(textres) > 0 )
   {
     strcpy(decoded_results->speechtext, textres);
@@ -3633,6 +3633,28 @@ int deepspeech_init(){
 
   av_log(0, AV_LOG_INFO, "Speech model created successfully.\n");
   return 0;
+}
+
+SwrContext* get_swrcontext(Audioinfo audio_input){
+  SwrContext* resample_ctx = NULL;
+  int output_channels = 1;
+  int output_rate = 16000;
+  enum AVSampleFormat output_sample_fmt = AV_SAMPLE_FMT_S16;
+  resample_ctx = swr_alloc_set_opts(resample_ctx, av_get_default_channel_layout(output_channels),output_sample_fmt,output_rate,
+                            av_get_default_channel_layout(audio_input.input_channels), audio_input.input_sample_fmt, audio_input.input_rate,0,NULL);
+  if(!resample_ctx){
+      printf("av_audio_resample_init fail!!!\n");
+      return NULL;
+  }
+  swr_init(resample_ctx);
+  av_log(0, AV_LOG_INFO, "resample context initialized\n");
+  return resample_ctx;  
+}
+
+int compare_audioinfo(Audioinfo a, Audioinfo b){
+  if( a.input_channels == b.input_channels && a.input_rate == b.input_rate && a.input_nb_samples == b.input_nb_samples && a.input_sample_fmt == b.input_sample_fmt)
+    return 0;
+  return -1;
 }
 
 #endif
