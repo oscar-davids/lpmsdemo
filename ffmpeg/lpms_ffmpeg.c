@@ -8,6 +8,7 @@
 #include <libavfilter/buffersrc.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
+#include <libswresample/swresample.h>
 
 #include <pthread.h>
 
@@ -15,6 +16,7 @@
 #include "libswscale/swscale.h"
 #include "libavutil/imgutils.h"
 #include "tensorflow/c/c_api.h"
+#include "deepspeech/deepspeech.h"
 #endif
 
 // Not great to appropriate internal API like this...
@@ -292,10 +294,10 @@ float **probs, int classes, boxobject *objects, int* count);
 //merge transcoding and classify for multi model
 DnnFilterNode* Filters = NULL;
 int DnnFilterNum = 0;
+ModelState* dsctx;
 
 static int  lpms_detectoneframewithctx(LVPDnnContext *ctx, AVFrame *in);
 static int  prepare_sws_context(LVPDnnContext *ctx, AVFrame *frame, int flagHW);
-
 void lpms_setfiltertype(LVPDnnContext* context, int ntype)
 {
   if(context == NULL || ntype < 0 || ntype >= (int)DNN_FILTERMAX ) return;
@@ -537,7 +539,9 @@ output_results * output_results_init(int isYolo)
 {
   output_results *result = (output_results*)malloc(sizeof(output_results));
   memset(result, 0x00, sizeof(output_results));
-  
+  result->speechtext = (char*)malloc(MAXPATH * sizeof(char));
+  memset(result->speechtext, 0x00, MAXPATH * sizeof(char));
+
   if (isYolo){
     result->desc = (char*)malloc(YOLOMAXPATH * sizeof(char));
     memset(result->desc, 0x00, YOLOMAXPATH * sizeof(char)); 
@@ -552,6 +556,8 @@ void output_results_destroy(output_results* output_results)
   if(output_results == NULL) return;
   if(output_results->desc!= NULL)
       free(output_results->desc);
+  if(output_results->speechtext!= NULL)
+    free(output_results->speechtext);
   free(output_results);
 }
 
@@ -1575,6 +1581,7 @@ handle_r2h_err:
   if (ic) avformat_close_input(&ic);
   if (oc) avformat_free_context(oc);
   if (md) av_dict_free(&md);
+
   return ret == AVERROR_EOF ? 0 : ret;
 }
 
@@ -1596,6 +1603,9 @@ int transcode(struct transcode_thread *h,
   int nb_outputs = h->nb_outputs;
   AVPacket ipkt;
   AVFrame *dframe = NULL;
+
+  ds_audio_buffer audio_buffer = {0,};
+  audio_buffer.buffer = (char *)av_malloc(MAX_AUDIO_BUFFER_SIZE);
   //added module for classify
 
   if (!inp || !ictx) main_err("transcoder: Missing input params\n")
@@ -1741,6 +1751,46 @@ int transcode(struct transcode_thread *h,
       }
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
       if (has_frame) ictx->next_pts_a = dframe->pts + dframe->pkt_duration;
+
+      SwrContext* resample_ctx = NULL;
+
+      int output_channels = 1;
+      int output_rate = 16000;
+      int input_channels = dframe->channels;
+      int input_rate = dframe->sample_rate;
+      int input_nb_samples = dframe->nb_samples;
+      enum AVSampleFormat input_sample_fmt = ictx->ac->sample_fmt;
+      enum AVSampleFormat output_sample_fmt = AV_SAMPLE_FMT_S16;
+      resample_ctx = swr_alloc_set_opts(resample_ctx, av_get_default_channel_layout(output_channels),output_sample_fmt,output_rate,
+                            av_get_default_channel_layout(input_channels),input_sample_fmt, input_rate,0,NULL);
+      if(!resample_ctx){
+          printf("av_audio_resample_init fail!!!\n");
+          return -1;
+      }
+      swr_init(resample_ctx);
+      uint8_t* out_buffer = (uint8_t*)av_malloc(MAX_AUDIO_FRAME_SIZE);
+            //resample
+      memset(out_buffer,0x00,sizeof(out_buffer));
+
+      // size = dframe->nb_samples * av_get_bytes_per_sample((AVSampleFormat)dframe->format);
+      // av_log(0, AV_LOG_INFO, "");
+      int out_nb_samples = av_rescale_rnd(swr_get_delay(resample_ctx, input_rate) + input_nb_samples, output_rate, input_rate, AV_ROUND_UP);
+
+      int out_samples = swr_convert(resample_ctx,&out_buffer,out_nb_samples,(const uint8_t **)dframe->data,dframe->nb_samples);
+      int out_buffer_size;
+      if(out_samples > 0){
+          out_buffer_size = av_samples_get_buffer_size(NULL,output_channels ,out_samples, output_sample_fmt, 1);
+          memcpy(audio_buffer.buffer + audio_buffer.buffer_size, out_buffer, out_buffer_size);
+          audio_buffer.buffer_size += out_buffer_size;
+          
+          // for debug
+          // fwrite(out_buffer, 1, out_buffer_size, audio_dst_file2);
+          // DS_FeedAudioContent(streamctx, out_buffer, out_buffer_size);
+      }
+
+      // av_log(0, AV_LOG_INFO, "input_nb_samples:%d, outnbsamples: %d, outsamples:%d, bufsize:%d\n",input_nb_samples, out_nb_samples, out_samples, out_buffer_size);
+      swr_free(&resample_ctx);
+      av_free(out_buffer);
     }
 
     for (i = 0; i < nb_outputs; i++) {
@@ -1787,6 +1837,14 @@ int transcode(struct transcode_thread *h,
 whileloop_end:
     av_packet_unref(&ipkt);
   }
+
+  const char *textres = NULL;
+  textres = DS_SpeechToText(dsctx, audio_buffer.buffer, audio_buffer.buffer_size);
+  if ( strlen(textres) > 0 )
+  {
+    strcpy(decoded_results->speechtext, textres);
+  }
+  av_free(audio_buffer.buffer);
 
   // flush outputs
   for (i = 0; i < nb_outputs; i++) {
@@ -2810,8 +2868,10 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
   DNNReturnType result;
   DNNData model_input;
   int check;
-  if(ctx ==NULL || fmodelpath == NULL) return DNN_ERROR;  
+  int dsmodel_status = deepspeech_init();
   
+  if(ctx ==NULL || fmodelpath == NULL) return DNN_ERROR;  
+
   ctx->model_filename = (char*)malloc(MAXPATH);
   ctx->model_inputname = (char*)malloc(MAXPATH);
   ctx->model_outputname = (char*)malloc(MAXPATH);
@@ -2927,6 +2987,8 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
     break;
   }
   
+  if (dsmodel_status != 0)
+    return dsmodel_status;
   //av_log(NULL, AV_LOG_ERROR, "lpms_dnninitwithctx model success\n");
   return DNN_SUCCESS;
 }
@@ -2934,7 +2996,10 @@ int  lpms_dnninitwithctx(LVPDnnContext* ctx, char* fmodelpath, char* input, char
 void  lpms_dnnfreewithctx(LVPDnnContext *context)
 {
   if(context == NULL) return;
-
+  if(dsctx){
+    av_log(0, AV_LOG_INFO, "Freeing speech model.\n");
+    DS_FreeModel(dsctx);
+  }
   if(context->sws_rgb_scale)
   sws_freeContext(context->sws_rgb_scale);
   if(context->sws_gray8_to_grayf32)
@@ -3550,4 +3615,24 @@ float **probs, int classes, boxobject *objects, int* count)
     ctx->resultnum++;
   }
 }
+
+int deepspeech_init(){
+	const char *model = "deepspeechmodels.pbmm";
+	const char *scorer = "deepspeech-models.scorer";
+  int status = DS_CreateModel(model, &dsctx);
+  if (status != 0){
+    av_log(0, AV_LOG_ERROR, "speech model create failed\n");    
+    return -1;
+  }
+
+  status = DS_EnableExternalScorer(dsctx, scorer);
+	if (status != 0) {
+		fprintf(stderr, "Could not enable external scorer.\n");
+		return 1;
+	}
+
+  av_log(0, AV_LOG_INFO, "Speech model created successfully.\n");
+  return 0;
+}
+
 #endif

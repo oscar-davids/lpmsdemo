@@ -16,8 +16,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/joy4/av"
 	"github.com/oscar-davids/lpmsdemo/ffmpeg"
-	"github.com/oscar-davids/lpmsdemo/stream"
 	"github.com/oscar-davids/lpmsdemo/m3u8"
+	"github.com/oscar-davids/lpmsdemo/stream"
 )
 
 var ErrSegmenterTimeout = errors.New("SegmenterTimeout")
@@ -101,6 +101,7 @@ func (s *FFMpegVideoSegmenter) PollSegment(ctx context.Context) (*VideoSegment, 
 
 	name := s.StrmID + "_" + strconv.Itoa(s.curSegment) + ".ts"
 	plfn := fmt.Sprintf("%s/%s.m3u8", s.WorkDir, s.StrmID)
+	// subtitleplfn := fmt.Sprintf("%s/%s_subtitles.m3u8", s.WorkDir, s.StrmID)
 
 	for i := 0; i < PlaylistRetryCount; i++ {
 		pl, _ := m3u8.NewMediaPlaylist(uint(s.curSegment+1), uint(s.curSegment+1))

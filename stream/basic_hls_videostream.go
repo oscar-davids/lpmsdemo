@@ -3,6 +3,7 @@ package stream
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,8 +21,10 @@ var ErrAddHLSSegment = errors.New("ErrAddHLSSegment")
 
 //BasicHLSVideoStream is a basic implementation of HLSVideoStream
 type BasicHLSVideoStream struct {
-	plCache    *m3u8.MediaPlaylist //StrmID -> MediaPlaylist
-	segMap     map[string]*HLSSegment
+	plCache       *m3u8.MediaPlaylist //StrmID -> MediaPlaylist
+	subtitleCache *m3u8.MediaPlaylist // subtitle playlist
+	segMap        map[string]*HLSSegment
+	// subtitleMap   map[string]*
 	segNames   []string
 	lock       sync.Locker
 	strmID     string
@@ -35,13 +38,16 @@ func NewBasicHLSVideoStream(strmID string, wSize uint) *BasicHLSVideoStream {
 		return nil
 	}
 
+	subpl, err := m3u8.NewMediaPlaylist(wSize, DefaultHLSStreamCap)
+
 	return &BasicHLSVideoStream{
-		plCache:  pl,
-		segMap:   make(map[string]*HLSSegment),
-		segNames: make([]string, 0),
-		lock:     &sync.Mutex{},
-		strmID:   strmID,
-		winSize:  wSize,
+		plCache:       pl,
+		subtitleCache: subpl,
+		segMap:        make(map[string]*HLSSegment),
+		segNames:      make([]string, 0),
+		lock:          &sync.Mutex{},
+		strmID:        strmID,
+		winSize:       wSize,
 	}
 }
 
@@ -65,6 +71,15 @@ func (s *BasicHLSVideoStream) GetStreamPlaylist() (*m3u8.MediaPlaylist, error) {
 	}
 
 	return s.plCache, nil
+}
+
+//GetSubtitlePlaylist returns the subtitle playlist represented by the streamID
+func (s *BasicHLSVideoStream) GetSubtitlePlaylist() (*m3u8.MediaPlaylist, error) {
+	if s.subtitleCache.Count() < s.winSize {
+		return nil, nil
+	}
+
+	return s.subtitleCache, nil
 }
 
 //GetHLSSegment gets the HLS segment.  It blocks until something is found, or timeout happens.
@@ -136,6 +151,22 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 		s.segNames = s.segNames[1:]
 	}
 
+	// Add segment to subtitle playlist
+	subtitleName := strings.Replace(seg.Name, ".ts", ".webvtt", 1)
+	s.subtitleCache.AppendSegment(&m3u8.MediaSegment{SeqId: seg.SeqNo, Duration: seg.Duration, URI: subtitleName})
+	if s.subtitleCache.Count() > s.winSize {
+		s.subtitleCache.Remove()
+	}
+
+	startstamp := seg.Duration * float64(seg.SeqNo)
+	endstamp := startstamp + seg.Duration
+	startduration := time.Duration(startstamp) * time.Second
+	endduration := time.Duration(endstamp) * time.Second
+	segstart := fmtDuration(startduration)
+	segend := fmtDuration(endduration)
+
+	seg.Subtitles = fmt.Sprintf("WEBVTT\n\n%s --> %s\n%s%s", segstart, segend, seg.Subtitles, subtitleName)
+
 	//Call subscriber
 	//if s.subscriber != nil {
 	//	s.subscriber(seg, false)
@@ -159,4 +190,12 @@ func (s *BasicHLSVideoStream) End() {
 
 func (s BasicHLSVideoStream) String() string {
 	return fmt.Sprintf("StreamID: %v, Type: %v, len: %v", s.GetStreamID(), s.GetStreamFormat(), len(s.segMap))
+}
+
+func fmtDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	return fmt.Sprintf("%02d:%02d.000", m, s)
 }

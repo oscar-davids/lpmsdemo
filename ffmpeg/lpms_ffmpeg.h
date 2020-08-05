@@ -17,6 +17,14 @@
 #define YOLO_FRESULTALLOWPATH    50
 #endif
 
+#ifndef MAX_AUDIO_FRAME_SIZE
+#define MAX_AUDIO_FRAME_SIZE 32000
+#endif
+
+#ifndef MAX_AUDIO_BUFFER_SIZE
+#define MAX_AUDIO_BUFFER_SIZE 512000
+#endif
+
 // LPMS specific errors
 extern const int lpms_ERR_INPUT_PIXFMT;
 extern const int lpms_ERR_FILTERS;
@@ -63,6 +71,7 @@ typedef struct {
     int     frames;
     int64_t pixels;
     char    *desc;
+    char    *speechtext;
 } output_results;
 
 
@@ -257,6 +266,14 @@ void lpms_dnnCdelete(LVPDnnContext* context);
 
 Vinfo*  lpms_vinfonew();
 int     lpms_getvideoinfo(char* ivpath, Vinfo* vinfo);
+
+//added for speech recognition
+typedef struct {
+	char*  buffer;
+	size_t buffer_size;
+} ds_audio_buffer;
+
+int deepspeech_init();
 
 #endif
 #endif // _LPMS_FFMPEG_H_
