@@ -165,7 +165,7 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	segstart := fmtDuration(startduration)
 	segend := fmtDuration(endduration)
 
-	seg.Subtitles = fmt.Sprintf("WEBVTT\n\n%s --> %s\n%s%s", segstart, segend, seg.Subtitles, subtitleName)
+	seg.Subtitles = fmt.Sprintf("WEBVTT\n\n%s --> %s\n%s", segstart, segend, seg.Subtitles)
 
 	//Call subscriber
 	//if s.subscriber != nil {
