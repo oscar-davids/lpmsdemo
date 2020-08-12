@@ -52,6 +52,11 @@ type VideoProfile struct {
 
 	Detector DetectorProfile
 }
+//dnnmodel description
+//tadmodel.pb : adult detection classification model
+//tafmodel.pb : adult & football match detection classification model
+//tviomodel.pb : violence detection classification model
+//tyolov3model.pb : yolo v3 object detection model
 
 //Some sample video profiles
 var (
@@ -70,13 +75,13 @@ var (
 	P144p30fps16x9 = VideoProfile{Name: "P144p30fps16x9", Bitrate: "400k", Framerate: 30, AspectRatio: "16:9", Resolution: "256x144"}
 	P144p25fps16x9 = VideoProfile{Name: "P144p25fps16x9", Bitrate: "400k", Framerate: 25, AspectRatio: "16:9", Resolution: "256x144"}
 	PDnnDetector   = VideoProfile{Name: "PDnnDetector", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tafmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}}
 	PDnnVioFilter = VideoProfile{Name: "PDnnVioFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tvmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tviomodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, MetaMode: 0, ClassName: []string{"violence"}}}
 	PDnnOtherFilter = VideoProfile{Name: "PDnnOtherFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "224x224",
-		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tmodel2.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
+		Detector: DetectorProfile{SampleRate: 30, ModelPath: "tadmodel.pb", Threshold: 0.8, Input: "input_1", Output: "reshape_3/Reshape",
 			ClassID: 0, MetaMode: 0, ClassName: []string{"adult", "football match"}}}
 	PDnnYoloFilter = VideoProfile{Name: "PDnnYoloFilter", Bitrate: "400k", Framerate: 20, AspectRatio: "1:1", Resolution: "416x416",
 		Detector: DetectorProfile{Dnntype: DnnYolo, SampleRate: 30, ModelPath: "tyolov3model.pb", Threshold: 0.6, Input: "inputs", Output: "output_boxes",
