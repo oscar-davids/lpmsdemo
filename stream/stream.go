@@ -94,3 +94,5 @@ type HLSSegment struct {
 func samePlaylist(p1, p2 m3u8.MediaPlaylist) bool {
 	return bytes.Compare(p1.Encode().Bytes(), p2.Encode().Bytes()) == 0
 }
+
+var CurSegStart float64

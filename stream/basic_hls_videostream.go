@@ -158,7 +158,7 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 		s.subtitleCache.Remove()
 	}
 
-	startstamp := seg.Duration * float64(seg.SeqNo)
+	startstamp := CurSegStart
 	endstamp := startstamp + seg.Duration
 	startduration := time.Duration(startstamp) * time.Second
 	endduration := time.Duration(endstamp) * time.Second
@@ -166,7 +166,7 @@ func (s *BasicHLSVideoStream) AddHLSSegment(seg *HLSSegment) error {
 	segend := fmtDuration(endduration)
 
 	seg.Subtitles = fmt.Sprintf("WEBVTT\n\n%s --> %s\n%s", segstart, segend, seg.Subtitles)
-
+	CurSegStart += seg.Duration
 	//Call subscriber
 	//if s.subscriber != nil {
 	//	s.subscriber(seg, false)

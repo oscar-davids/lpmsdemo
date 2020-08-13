@@ -73,6 +73,7 @@ typedef struct {
     int64_t pixels;
     char    *desc;
     char    *speechtext;
+    double seg_duration;
 } output_results;
 
 

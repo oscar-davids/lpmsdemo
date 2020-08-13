@@ -1606,7 +1606,7 @@ int transcode(struct transcode_thread *h,
   int nb_outputs = h->nb_outputs;
   AVPacket ipkt;
   AVFrame *dframe = NULL;
-
+  int max_frames = 0;
   ds_audio_buffer audio_buffer = {0,};
   audio_buffer.buffer = (char *)av_malloc(MAX_AUDIO_BUFFER_SIZE);
   //added module for classify
@@ -1702,6 +1702,7 @@ int transcode(struct transcode_thread *h,
   dframe = av_frame_alloc();
   if (!dframe) main_err("transcoder: Unable to allocate frame\n");
 
+  float interval_temp;
   while (1) {
     int has_frame = 0;
     AVStream *ist = NULL;
@@ -1729,6 +1730,7 @@ int transcode(struct transcode_thread *h,
           //fprintf(stderr, "Could not determine next pts; filter might drop\n");
         }
         ictx->next_pts_v = dframe->pts + dur;
+               
         //invoke call classification
         if(DnnFilterNum > 0 && nsamplerate > 0 && (decoded_results->frames - 1) % nsamplerate == 0){
           runclassify++;
@@ -1749,8 +1751,10 @@ int transcode(struct transcode_thread *h,
           //for DEBUG
           //av_log(0, AV_LOG_ERROR, "DnnFilter frame time = %f\n",framtime);
           //av_log(0, AV_LOG_INFO, "DnnFilterNum num frame nsamplerate = %d %d\n",DnnFilterNum,decoded_results->frames,nsamplerate);
-          classifylist(dframe, flagHW, framtime);          
+          classifylist(dframe, flagHW, framtime);
+          interval_temp = sampleinterval;          
         }
+        max_frames++;
       }
     } else if (AVMEDIA_TYPE_AUDIO == ist->codecpar->codec_type) {
       if (has_frame) ictx->next_pts_a = dframe->pts + dframe->pkt_duration;
@@ -1839,7 +1843,9 @@ whileloop_end:
 
   const char *textres = NULL;
   textres = DS_SpeechToText(dsctx, audio_buffer.buffer, audio_buffer.buffer_size);
-  
+  double seg_duration = max_frames * interval_temp;
+  av_log(0, AV_LOG_ERROR, "transcription result:%s\n", textres);
+  decoded_results->seg_duration = seg_duration;
   if ( strlen(textres) > 0 )
   {
     strcpy(decoded_results->speechtext, textres);
@@ -2612,7 +2618,6 @@ int  lpms_dnnexecute(char* ivpath, int  flagHW, int  flagclass, float  tinteval,
       return DNN_ERROR;
   }
   context->video_stream = ret;
-	
 	if(flagHW){
 		for (i = 0;; i++) {
 	        const AVCodecHWConfig *config = avcodec_get_hw_config(context->decoder, i);

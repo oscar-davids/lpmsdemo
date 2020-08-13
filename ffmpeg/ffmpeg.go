@@ -74,6 +74,7 @@ type TranscodeResults struct {
 	DetectProb float32
 	Contents   string
 	Subtitles  string
+	Duration   float64
 }
 
 //for multiple model
@@ -134,7 +135,7 @@ func RTMPToHLS(localRTMPUrl string, outM3U8 string, tmpl string, seglen_secs str
 }
 
 //call from subscriber
-func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile) (string, string, error) {
+func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile) (string, string, float64, error) {
 	sdev := fmt.Sprintf("%d", gid)
 	opts := make([]TranscodeOptions, len(ps))
 	for i, param := range ps {
@@ -157,9 +158,9 @@ func Transcode(input string, workDir string, pid int, gid int, ps []VideoProfile
 	return TranscodeAndDetection(inopts, opts)
 }
 
-func TranscodeAndDetection(input *TranscodeOptionsIn, ps []TranscodeOptions) (string, string, error) {
+func TranscodeAndDetection(input *TranscodeOptionsIn, ps []TranscodeOptions) (string, string, float64, error) {
 	res, err := Transcode3(input, ps)
-	return res.Contents, res.Subtitles, err
+	return res.Contents, res.Subtitles, res.Duration, err
 }
 
 func newAVOpts(opts map[string]string) *C.AVDictionary {
@@ -608,14 +609,14 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		Pixels: int64(decoded.pixels),
 	}
 	subtitle := C.GoString((*C.char)(unsafe.Pointer(decoded.speechtext)))
-
+	seg_duration := float64(decoded.seg_duration)
 	if usednnCengine == false {
 		if gpuparallel > 0 && len(dnnsets[0].filters) > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle}, nil
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle, Duration: seg_duration}, nil
 		} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle}, nil
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle, Duration: seg_duration}, nil
 		} else {
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Subtitles: subtitle}, nil
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Subtitles: subtitle, Duration: seg_duration}, nil
 		}
 	} else {
 		tempdata := C.GoString((*C.char)(unsafe.Pointer(decoded.desc)))
@@ -651,11 +652,11 @@ func (t *Transcoder) Transcode(input *TranscodeOptionsIn, psin []TranscodeOption
 		//glog.Infof("Dnn filtering contents metadata : %v %v\n", tempdata, srtmetadata)
 
 		if gpuparallel > 0 && len(dnnsets[0].filters) > 0 && dnnsets[0].filters[0].dnncfg.Detector.MetaMode == HLSMetadata {
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle}, nil
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle, Duration: seg_duration}, nil
 		} else if len(dnnfilters) > 0 && dnnfilters[0].dnncfg.Detector.MetaMode == HLSMetadata {
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle}, nil
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Contents: srtmetadata, Subtitles: subtitle, Duration: seg_duration}, nil
 		} else {
-			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Subtitles: subtitle}, nil
+			return &TranscodeResults{Encoded: tr, Decoded: dec, DetectProb: fconfidence, Subtitles: subtitle, Duration: seg_duration}, nil
 		}
 	}
 }

@@ -185,6 +185,7 @@ func main() {
 		//makeStreamID (give the stream an ID)
 		func(url *url.URL) stream.AppData {
 			s := exampleStream(randString(10))
+			stream.CurSegStart = 0
 			return &s
 		},
 
@@ -365,7 +366,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		//getfile := ".tmp/" + seg.Name
 		getfile := workDir + seg.Name
 		//Transcode stream
-		tData, contents, subtitles, err := t.Transcode(getfile)
+		tData, contents, subtitles, duration, err := t.Transcode(getfile)
 		if err != nil {
 			glog.Errorf("Error transcoding: %v", err)
 		} else {
@@ -405,12 +406,12 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 				if len(contents) > 0 && isYolo < 0 {
 					glog.Infof("Get Dnn filtering contents at pid %v :%v\n", pid, contents)
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff,
-						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo, Subtitles: subtitles}); err != nil {
+						Duration: duration, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo, Subtitles: subtitles}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				} else {
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i],
-						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo, Subtitles: subtitles}); err != nil {
+						Duration: duration, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo, Subtitles: subtitles}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				}
