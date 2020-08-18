@@ -1730,7 +1730,14 @@ int transcode(struct transcode_thread *h,
           //fprintf(stderr, "Could not determine next pts; filter might drop\n");
         }
         ictx->next_pts_v = dframe->pts + dur;
-               
+
+        if(ist->r_frame_rate.den > 0.0){
+          interval_temp = 1.0 / av_q2d(ist->r_frame_rate);
+        } else  {
+          interval_temp = av_q2d(ist->time_base);    
+        }
+
+
         //invoke call classification
         if(DnnFilterNum > 0 && nsamplerate > 0 && (decoded_results->frames - 1) % nsamplerate == 0){
           runclassify++;
@@ -1752,7 +1759,7 @@ int transcode(struct transcode_thread *h,
           //av_log(0, AV_LOG_ERROR, "DnnFilter frame time = %f\n",framtime);
           //av_log(0, AV_LOG_INFO, "DnnFilterNum num frame nsamplerate = %d %d\n",DnnFilterNum,decoded_results->frames,nsamplerate);
           classifylist(dframe, flagHW, framtime);
-          interval_temp = sampleinterval;          
+          // interval_temp = sampleinterval;          
         }
         max_frames++;
       }
