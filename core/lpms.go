@@ -12,11 +12,11 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/oscar-davids/lpmsdemo/ffmpeg"
+	"github.com/oscar-davids/lpmsdemo/m3u8"
 	"github.com/oscar-davids/lpmsdemo/segmenter"
 	"github.com/oscar-davids/lpmsdemo/stream"
 	"github.com/oscar-davids/lpmsdemo/vidlistener"
 	"github.com/oscar-davids/lpmsdemo/vidplayer"
-	"github.com/oscar-davids/lpmsdemo/m3u8"
 
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
 )
@@ -132,7 +132,7 @@ func (l *LPMS) HandleRTMPPlay(getStream func(url *url.URL) (stream.RTMPVideoStre
 func (l *LPMS) HandleHLSPlay(
 	getMasterPlaylist func(url *url.URL) (*m3u8.MasterPlaylist, error),
 	getMediaPlaylist func(url *url.URL) (*m3u8.MediaPlaylist, error),
-	getSegment func(url *url.URL) ([]byte, error)) {
+	getSegment func(url *url.URL) ([]byte, string, error)) {
 
 	l.vidPlayer.HandleHLSPlay(getMasterPlaylist, getMediaPlaylist, getSegment)
 }

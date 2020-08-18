@@ -40,6 +40,7 @@ type HLSVideoManifest interface {
 type HLSVideoStream interface {
 	VideoStream
 	GetStreamPlaylist() (*m3u8.MediaPlaylist, error)
+	GetSubtitlePlaylist() (*m3u8.MediaPlaylist, error)
 	// GetStreamVariant() *m3u8.Variant
 	GetHLSSegment(segName string) (*HLSSegment, error)
 	AddHLSSegment(seg *HLSSegment) error

@@ -87,9 +87,12 @@ type HLSSegment struct {
 	FgContents int //0:Contents None, 1:ContentsStart, 2:ContentsContinue, 3:ContentsEnd
 	ObjectData string
 	IsYolo     int
+	Subtitles  string
 }
 
 //Compare playlists by segments
 func samePlaylist(p1, p2 m3u8.MediaPlaylist) bool {
 	return bytes.Compare(p1.Encode().Bytes(), p2.Encode().Bytes()) == 0
 }
+
+var CurSegStart float64
