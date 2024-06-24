@@ -32,13 +32,14 @@ func (t *FFMpegSegmentTranscoder) SetParallelID(pid int) {
 func (t *FFMpegSegmentTranscoder) SetGpuID(gid int) {
 	t.gpuid = gid
 }
-func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, string, error) {
+func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, string, string, float64, error) {
 	//Invoke ffmpeg
 	contents := ""
-	contents, err := ffmpeg.Transcode(fname, t.workDir, t.parallelid, t.gpuid, t.tProfiles)
+	subtitles := ""
+	contents, subtitles, duration, err := ffmpeg.Transcode(fname, t.workDir, t.parallelid, t.gpuid, t.tProfiles)
 	if err != nil {
 		glog.Errorf("Error transcoding: %v", err)
-		return nil, contents, err
+		return nil, contents, subtitles, duration, err
 	}
 
 	dout := make([][]byte, len(t.tProfiles), len(t.tProfiles))
@@ -56,5 +57,5 @@ func (t *FFMpegSegmentTranscoder) Transcode(fname string) ([][]byte, string, err
 		os.Remove(ofile)
 	}
 
-	return dout, contents, nil
+	return dout, contents, subtitles, duration, nil
 }

@@ -59,6 +59,7 @@ func (p *MasterPlaylist) Append(uri string, chunklist *MediaPlaylist, params Var
 	v.Chunklist = chunklist
 	v.VariantParams = params
 	p.Variants = append(p.Variants, v)
+
 	if len(v.Alternatives) > 0 {
 		// From section 7:
 		// The EXT-X-MEDIA tag and the AUDIO, VIDEO and SUBTITLES attributes of
@@ -937,6 +938,7 @@ func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 	p.winsize = winsize
 	return nil
 }
+
 // Set program date range for the current media segment.
 // EXT-X-DATERANGE support for protocol version 7.
 func (p *MediaPlaylist) SetDateRange(dateRange *DateRange) error {

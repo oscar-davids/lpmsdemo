@@ -18,8 +18,8 @@ import (
 
 	"github.com/golang/glog"
 	joy4rtmp "github.com/livepeer/joy4/format/rtmp"
-	"github.com/oscar-davids/lpmsdemo/stream"
 	"github.com/oscar-davids/lpmsdemo/m3u8"
+	"github.com/oscar-davids/lpmsdemo/stream"
 )
 
 var ErrNotFound = errors.New("ErrNotFound")
@@ -86,7 +86,7 @@ func (s *VidPlayer) rtmpServerHandlePlay() func(conn *joy4rtmp.Conn) {
 func (s *VidPlayer) HandleHLSPlay(
 	getMasterPlaylist func(url *url.URL) (*m3u8.MasterPlaylist, error),
 	getMediaPlaylist func(url *url.URL) (*m3u8.MediaPlaylist, error),
-	getSegment func(url *url.URL) ([]byte, error)) {
+	getSegment func(url *url.URL) ([]byte, string, error)) {
 
 	s.mux.HandleFunc("/stream/", func(w http.ResponseWriter, r *http.Request) {
 		handleLive(w, r, getMasterPlaylist, getMediaPlaylist, getSegment)
@@ -100,12 +100,12 @@ func (s *VidPlayer) HandleHLSPlay(
 func handleLive(w http.ResponseWriter, r *http.Request,
 	getMasterPlaylist func(url *url.URL) (*m3u8.MasterPlaylist, error),
 	getMediaPlaylist func(url *url.URL) (*m3u8.MediaPlaylist, error),
-	getSegment func(url *url.URL) ([]byte, error)) {
+	getSegment func(url *url.URL) ([]byte, string, error)) {
 
 	glog.Infof("LPMS got HTTP request @ %v", r.URL.Path)
 
-	if !strings.HasSuffix(r.URL.Path, ".m3u8") && !strings.HasSuffix(r.URL.Path, ".ts") {
-		http.Error(w, "LPMS only accepts HLS requests over HTTP (m3u8, ts).", 500)
+	if !strings.HasSuffix(r.URL.Path, ".m3u8") && !strings.HasSuffix(r.URL.Path, ".ts") && !strings.HasSuffix(r.URL.Path, ".webvtt") {
+		http.Error(w, "LPMS only accepts HLS requests over HTTP (m3u8, ts, webvtt).", 500)
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Expose-Headers", "Content-Length")
@@ -136,7 +136,6 @@ func handleLive(w http.ResponseWriter, r *http.Request,
 		if masterPl != nil && len(masterPl.Variants) > 0 {
 			w.Header().Set("Connection", "keep-alive")
 			_, err = w.Write(masterPl.Encode().Bytes())
-			// glog.Infof("%v", string(masterPl.Encode().Bytes()))
 			return
 		}
 
@@ -159,8 +158,8 @@ func handleLive(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	if strings.HasSuffix(r.URL.Path, ".ts") {
-		seg, err := getSegment(r.URL)
+	if strings.HasSuffix(r.URL.Path, ".ts") || strings.HasSuffix(r.URL.Path, ".webvtt") {
+		seg, subtitles, err := getSegment(r.URL)
 		if err != nil {
 			glog.Errorf("Error getting segment %v: %v", r.URL, err)
 			if err == ErrNotFound {
@@ -170,26 +169,33 @@ func handleLive(w http.ResponseWriter, r *http.Request,
 			}
 			return
 		}
-		w.Header().Set("Content-Type", mime.TypeByExtension(path.Ext(r.URL.Path)))
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Expose-Headers", "Content-Length")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("Content-Length", strconv.Itoa(len(seg)))
-		_, err = w.Write(seg)
-		if err != nil {
-			glog.Errorf("Error writting HLS segment %v: %v", r.URL, err)
-			if err == ErrNotFound {
-				http.Error(w, "ErrNotFound", 404)
-			} else if err == ErrTimeout {
-				http.Error(w, "ErrTimeout", 408)
-			} else if err == ErrBadRequest {
-				http.Error(w, "ErrBadRequest", 400)
-			} else {
-				http.Error(w, "Error writting segment", 500)
+		if strings.HasSuffix(r.URL.Path, ".webvtt") {
+			w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("Connection", "keep-alive")
+			w.Write([]byte(subtitles))
+			return
+		} else {
+			w.Header().Set("Content-Type", mime.TypeByExtension(path.Ext(r.URL.Path)))
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Expose-Headers", "Content-Length")
+			w.Header().Set("Connection", "keep-alive")
+			w.Header().Set("Content-Length", strconv.Itoa(len(seg)))
+			_, err = w.Write(seg)
+			if err != nil {
+				glog.Errorf("Error writting HLS segment %v: %v", r.URL, err)
+				if err == ErrNotFound {
+					http.Error(w, "ErrNotFound", 404)
+				} else if err == ErrTimeout {
+					http.Error(w, "ErrTimeout", 408)
+				} else if err == ErrBadRequest {
+					http.Error(w, "ErrBadRequest", 400)
+				} else {
+					http.Error(w, "Error writting segment", 500)
+				}
+				return
 			}
 			return
 		}
-		return
 	}
 
 	http.Error(w, "Cannot find HTTP video resource: "+r.URL.String(), 404)

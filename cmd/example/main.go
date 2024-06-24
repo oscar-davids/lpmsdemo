@@ -52,13 +52,25 @@ func parseStreamID(reqPath string) string {
 	return strmID
 }
 
+func parseStreamIndex(reqPath string) string {
+	var strmID string
+	regex, _ := regexp.Compile("\\/stream\\/.*")
+	match := regex.FindString(reqPath)
+	if match != "" {
+		strmID = strings.Replace(match, "/stream/", "", -1)
+	}
+	return strmID
+}
+
 func getHLSSegmentName(url *url.URL) string {
 	var segName string
-	regex, _ := regexp.Compile("\\/stream\\/.*\\.ts")
+	regex, _ := regexp.Compile("\\/stream\\/.*\\.ts|\\/stream\\/.*\\.webvtt")
 	match := regex.FindString(url.Path)
 	if match != "" {
 		segName = strings.Replace(match, "/stream/", "", -1)
+		segName = strings.Replace(segName, ".webvtt", ".ts", -1)
 	}
+
 	return segName
 }
 func getRTMPRequestName(url *url.URL) string {
@@ -92,6 +104,7 @@ func main() {
 	gpucount := flag.Int("gpucount", 1, "avaible gpu count for clasiifier and transcoding")
 	parallel := flag.Int("parallel", 1, "parallel processing count for clasiifier")
 	embededdnn := flag.Int("embededdnn", 1, "if this flag set 1 then run tanscoding and claasify at same C engine")
+	transcription := flag.Int("transcription", 1, "if this flag set 1 then run transcription")
 
 	flag.Parse()
 	if flag.Parsed() == false || *interval <= float64(0.0) {
@@ -172,6 +185,7 @@ func main() {
 		//makeStreamID (give the stream an ID)
 		func(url *url.URL) stream.AppData {
 			s := exampleStream(randString(10))
+			stream.CurSegStart = 0
 			return &s
 		},
 
@@ -208,9 +222,16 @@ func main() {
 			mid := reqName + "_classified"
 			manifest = stream.NewBasicHLSVideoManifest(mid)
 			pl, _ := hlsStrm.GetStreamPlaylist()
-			variant := &m3u8.Variant{URI: fmt.Sprintf("%v.m3u8", mid), Chunklist: pl, VariantParams: m3u8.VariantParams{}}
-			manifest.AddVideoStream(hlsStrm, variant)
+			variantparams := m3u8.VariantParams{}
+			if *transcription == 1 {
+				// variantparams = m3u8.VariantParams{}
+				subtitleAlt := m3u8.Alternative{GroupId: "subs", URI: "subtitles.m3u8", Type: "SUBTITLES", Language: "en", Name: "English", Default: false, Forced: "NO"}
+				variantparams = m3u8.VariantParams{Alternatives: []*m3u8.Alternative{&subtitleAlt}}
+				variantparams.Subtitles = "subs"
+			}
 
+			variant := &m3u8.Variant{URI: fmt.Sprintf("%v_rendition.m3u8", mid), Chunklist: pl, VariantParams: variantparams}
+			manifest.AddVideoStream(hlsStrm, variant)
 			return nil
 		},
 		//endStream
@@ -229,7 +250,7 @@ func main() {
 	lpms.HandleHLSPlay(
 		//getMasterPlaylist
 		func(url *url.URL) (*m3u8.MasterPlaylist, error) {
-			if parseStreamID(url.Path) == "transcoded" && hlsStrm != nil {
+			if parseStreamIndex(url.Path) == "test_classified.m3u8" && hlsStrm != nil {
 				mpl, err := manifest.GetManifest()
 				if err != nil {
 					glog.Errorf("Error getting master playlist: %v", err)
@@ -245,6 +266,24 @@ func main() {
 			if nil == hlsStrm {
 				return nil, fmt.Errorf("No stream available")
 			}
+
+			if parseStreamIndex(url.Path) == "subtitles.m3u8" {
+				start := time.Now()
+				for time.Since(start) < HLSWaitTime {
+					subtitlepl, err := hlsStrm.GetSubtitlePlaylist()
+					if err != nil || subtitlepl == nil {
+						if err == stream.ErrEOF {
+							return nil, err
+						}
+
+						time.Sleep(2 * time.Second)
+						continue
+					} else {
+						return subtitlepl, nil
+					}
+				}
+			}
+
 			//Wait for the HLSBuffer gets populated, get the playlist from the buffer, and return it.
 			start := time.Now()
 			for time.Since(start) < HLSWaitTime {
@@ -263,13 +302,13 @@ func main() {
 			return nil, fmt.Errorf("Error getting playlist")
 		},
 		//getSegment
-		func(url *url.URL) ([]byte, error) {
+		func(url *url.URL) ([]byte, string, error) {
 			seg, err := hlsStrm.GetHLSSegment(getHLSSegmentName(url))
 			if err != nil {
 				glog.Errorf("Error getting segment: %v", err)
-				return nil, err
+				return nil, "", err
 			}
-			return seg.Data, nil
+			return seg.Data, seg.Subtitles, nil
 		})
 
 	lpms.HandleRTMPPlay(
@@ -294,7 +333,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		ffmpeg.P720p25fps16x9,
 		//ffmpeg.PDnnDetector,
 		//ffmpeg.P240p30fps16x9,
-		//ffmpeg.P576p30fps16x9,
+		// ffmpeg.P576p30fps16x9,
 	}
 	workDir := ".tmp/"
 	strmID := hlsStream.GetStreamID()
@@ -327,7 +366,7 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 		//getfile := ".tmp/" + seg.Name
 		getfile := workDir + seg.Name
 		//Transcode stream
-		tData, contents, err := t.Transcode(getfile)
+		tData, contents, subtitles, duration, err := t.Transcode(getfile)
 		if err != nil {
 			glog.Errorf("Error transcoding: %v", err)
 		} else {
@@ -367,12 +406,12 @@ func transcode(hlsStream stream.HLSVideoStream, flagclass int, tinterval float64
 				if len(contents) > 0 && isYolo < 0 {
 					glog.Infof("Get Dnn filtering contents at pid %v :%v\n", pid, contents)
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: warningbuff,
-						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo}); err != nil {
+						Duration: duration, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo, Subtitles: subtitles}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				} else {
 					if err := hlsStream.AddHLSSegment(&stream.HLSSegment{SeqNo: seg.SeqNo, Name: sName, Data: tData[i],
-						Duration: 2, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo}); err != nil {
+						Duration: duration, PgDataTime: PgDataTime, PgDataEnd: PgDataEnd, FgContents: FgContents, ObjectData: contents, IsYolo: isYolo, Subtitles: subtitles}); err != nil {
 						glog.Errorf("Error writing transcoded seg: %v", err)
 					}
 				}

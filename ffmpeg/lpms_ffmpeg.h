@@ -3,6 +3,7 @@
 
 #include <libavutil/hwcontext.h>
 #include <libavutil/rational.h>
+#include <libswresample/swresample.h>
 
 #ifndef MAXPATH
 #define MAXPATH 256
@@ -15,6 +16,14 @@
 #define MAX_YOLO_FRAME 256
 #define YOLO_FRESULTMAXPATH     512 //max 16 object in a frame
 #define YOLO_FRESULTALLOWPATH    50
+#endif
+
+#ifndef MAX_AUDIO_FRAME_SIZE
+#define MAX_AUDIO_FRAME_SIZE 32000
+#endif
+
+#ifndef MAX_AUDIO_BUFFER_SIZE
+#define MAX_AUDIO_BUFFER_SIZE 512000
 #endif
 
 // LPMS specific errors
@@ -63,6 +72,8 @@ typedef struct {
     int     frames;
     int64_t pixels;
     char    *desc;
+    char    *speechtext;
+    double seg_duration;
 } output_results;
 
 
@@ -97,6 +108,13 @@ typedef struct Vinfo{
     int framecount;
     float duration;
 } Vinfo;
+
+typedef struct Audioinfo{
+    int input_channels;
+    int input_rate;
+    int input_nb_samples;
+    enum AVSampleFormat input_sample_fmt;
+} Audioinfo;
 
 typedef struct box {
 	float x, y, w, h;
@@ -257,6 +275,16 @@ void lpms_dnnCdelete(LVPDnnContext* context);
 
 Vinfo*  lpms_vinfonew();
 int     lpms_getvideoinfo(char* ivpath, Vinfo* vinfo);
+
+//added for speech recognition
+typedef struct {
+	char*  buffer;
+	size_t buffer_size;
+} ds_audio_buffer;
+
+int deepspeech_init();
+SwrContext* get_swrcontext(Audioinfo audio_input);
+int compare_audioinfo(Audioinfo a, Audioinfo b);
 
 #endif
 #endif // _LPMS_FFMPEG_H_
